@@ -50,6 +50,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     ECDH,
 )
 import persistent
+import ZODB.Connection
 from smartcard.asn1 import (
     CodecCompact,
 )
@@ -1542,3 +1543,107 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             index=PW1_INDEX,
             new_reference=new_reference,
         )
+
+class PINQueueConnection(ZODB.Connection.Connection):
+    """
+    See OpenPGPRandomPassword.
+    """
+    def __init__(self, *args, **kw):
+        self.__pin_queue = kw.pop('pin_queue')
+        super().__init__(*args, **kw)
+
+    def setstate(self, obj):
+        super().setstate(obj)
+        if isintance(obj, OpenPGPRandomPassword):
+            obj.setPinQueue(self.__pin_queue)
+
+class OpenPGPRandomPassword(OpenPGP):
+    """
+    OpenPGP smartcard application which does not use a constant PIN, but
+    uses a PIN array, expected to be re-filled with random values anytime,
+    of which a single cell contains the accepted PIN.
+
+    This cell defaults to A1, but can be changed by a SET_REFERENCE_DATA call
+    with a new pin referencing the desired cell. Ex: B30000 will use cell B3,
+    2c0000 will use cell C2. Trailing zeroes are ignored, case is folded up.
+
+    XXX: Makes the card incompatible with Key Derived Function for PW1, but
+    there is no apparent way to disable KDF for a single PIN. So KDF is disabled
+    entirely.
+
+    When instances of this class are loaded from database, setPinQueue must be
+    called with the deque instance to use as PIN source.
+    Use PINQueueConnection as a ZODB connection class. Example:
+
+        class DB(ZODB.DB.DB):
+            klass = functools.partial(
+                PINQueueConnection,
+                pin_queue=function.pin_queue,
+            )
+        db = DB(
+            storage=ZODB.FileStorage.FileStorage(
+                file_name=self.__zodb_path,
+            ),
+            pool_size=1,
+        )
+    """
+
+    # XXX: can this be made compatible ? Probably not, as the pi is likely not
+    # capable of deriving the key fast enough.
+    _has_key_derived_function = False
+
+    def _getKeyDerivedFunction(self):
+        raise RecordNotFound
+
+    @property
+    def _dynamicGetDataObjectDict(self):
+        result = super()._dynamicGetDataObjectDict
+        result[KeyDerivedFunction] = '_getKeyDerivedFunction'
+        return result
+
+    _v_pin_queue = None
+    def setPinQueue(self, pin_queue):
+        self._v_pin_queue = pin_queue
+
+    def _getReferenceDataSet(self, index):
+        secret = super()._getReferenceDataSet(index=index)
+        if index == PW1_INDEX:
+            cell_id, = secret
+            cell_id = (
+                'A1'
+                if cell_id == DEFAULT_PW1 else
+                cell_id.decode('utf-8')
+            )
+            secret = []
+            while True:
+                try:
+                    item = pin_queue.popleft()
+                except IndexError:
+                    break
+                secret.append(item[cell_id].encode('utf-8'))
+        return secret
+
+    def getPIN1TriesLeft(self):
+        return self._getReferenceDataTriesLeft(index=PW1_INDEX)
+
+    def _setReferenceData(self, index, value):
+        if index == PW1_INDEX:
+            try:
+                value = value.decode('utf-8')
+            except UnicodeDecodeError:
+                raise WrongParameterInCommandData(repr(value)) from None
+            if set(value[2:]) != '0':
+                raise WrongParameterInCommandData(repr(value))
+            column = row = None
+            for character in value[:2]:
+                character = character.upper()
+                if character in DISPLAY_ROW_NAME:
+                    row = character
+                elif character in DISPLAY_COLUMN_NAME:
+                    column = character
+                else:
+                    raise WrongParameterInCommandData(repr(value))
+            if None in (column, row):
+                raise WrongParameterInCommandData(repr(value))
+            value = (row + column).encode('utf-8')
+        super()._setReferenceData(index=index, value=value)
