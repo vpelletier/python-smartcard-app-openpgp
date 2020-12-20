@@ -66,7 +66,8 @@ DeviceTree overlays, so there is some extra work needed:
      		-d $(depfile).dtc.tmp $(dtc-tmp) ; \
      	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
 
-- build the DeviceTree binary file (possibly on another machine, hence `ARCH`):
+- build the correct DeviceTree binary file for your model (here, the zero-w).
+  This can be done on another machine, hence the `ARCH` variable:
 
   .. code:: shell
 
