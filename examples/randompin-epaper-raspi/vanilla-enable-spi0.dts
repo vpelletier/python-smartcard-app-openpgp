@@ -1,0 +1,39 @@
+// Enable spi0 interface (board pins 19, 21, 23, 24, 26)
+/dts-v1/;
+/plugin/;
+
+/ {
+  compatible = "brcm,bcm2835";
+};
+
+&gpio {
+  alt0 {
+    brcm,pins = <4 5>; // removed 7, 8, 9, 10, 11
+  };
+  spi0_cs_pins: spi0_cs_pins {
+    brcm,function = <1>; // out
+    brcm,pins = <7 8>;
+  };
+  spi0_pins: spi0_pins {
+    brcm,function = <4>; // alt0
+    brcm,pins = <9 10 11>;
+  };
+};
+
+&spi {
+  cs-gpios = <&gpio 8 0x01>, <&gpio 7 0x01>; // CE0 is gpio 8, CE1 is gpio 7, both active low
+  status = "okay";
+  pinctrl-0 = <&spi0_cs_pins &spi0_pins>;
+  pinctrl-names = "default";
+  #address-cells = <1>;
+  #size-cells = <0>;
+  spidev@0 {
+    // "waveshare,epaper-display-v1": because that's what it really is.
+    // "rohm,dh2228fv": because this triggers spidev to handle this device.
+    compatible = "waveshare,epaper-display-v1", "rohm,dh2228fv";
+    reg = <0>; // uses CS0
+    #address-cells = <1>;
+    #size-cells = <0>;
+    spi-max-frequency = <4000000>; // 4MHz: tcycle >= 250ns
+  };
+};
