@@ -74,16 +74,16 @@ DeviceTree overlays, so there is some extra work needed:
     ARCH=arm make bcm2835-rpi-zero-w.dtb
 
 - build the provided overlay (using kernel-provided dtc command, you may also
-  install it from package device-tree-compiler):
+  install it from the `device-tree-compiler` package):
 
   .. code:: shell
 
-    $(KERNEL_SOURCE)/scripts/dtc/dtc -I dts -O dtb -o .dtb -@ -o vanilla-enable-spi0.dtbo vanilla-enable-spi0.dts
+    $(KERNEL_SOURCE)/scripts/dtc/dtc -I dts -O dtb -@ -o vanilla-enable-spi0.dtbo vanilla-enable-spi0.dts
 
 - (optional) check that the overlay is consistent with kernel's dtb using
-  fdtoverlay from tje device-tree-compiler package:
+  fdtoverlay from the `device-tree-compiler` package:
 
-  ..code:: shell
+  .. code:: shell
 
     fdtoverlay -i $(KERNEL_SOURCE)/arch/arm/boot/dts/bcm2835-rpi-zero-w.dtb -o /dev/null vanilla-enable-spi0.dtbo
 
