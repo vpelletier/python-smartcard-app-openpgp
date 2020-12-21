@@ -1,4 +1,4 @@
-OpenPGP smart-card application implementation.
+OpenPGP smartcard application implementation.
 
 It implements parts of the OpenPGP specification 3.4.1 .
 
@@ -31,7 +31,7 @@ In a nutshell:
 
 - the system administrator of the device running this code is considered to be
   benevolent and competent
-- the host accessing this device through the smart-card API (typically, via
+- the host accessing this device through the smartcard API (typically, via
   USB) is considered hostile
 - the close-range physical world surrounding the device is considered to be
   under control of the device owner
@@ -39,7 +39,7 @@ In a nutshell:
 In more details:
 
 This code is intended to be used on general-purpose computing modules, unlike
-traditional smart-card implementations. They cannot be assumed to have any
+traditional smartcard implementations. They cannot be assumed to have any
 hardening against physical access to their persistent (or even volatile)
 memory:
 
@@ -51,7 +51,7 @@ memory:
   it is configured to access
 - electronic noise (including actual noise: coil whine) will leak information
   about what the CPU is doing
-- they have communication channels dedicated smart-card hardware does not have:
+- they have communication channels dedicated smartcard hardware does not have:
   WiFi, Bluetooth, TTY on serial (possibly via USB), JTAG...
 
 So if an attacker gets physical access to them, their secrets should be
@@ -72,7 +72,8 @@ To do my daily job I rely on the same cryptographic operations as any other
 sysadmin: ssh key-based authentication, mail signature and decryption. When
 faced with the perspective of having to use a machine I do not trust enough
 to give it access to the machines my ssh key has access to, nor to give it
-access to the private key associated with my email address.
+access to the private key associated with my email address, I started looking
+for alternatives.
 
 So suddenly I needed another computer I trusted to hold those secrets, and go
 through it from the machine I was told to use. Which is cumbersome, both in
@@ -86,7 +87,7 @@ So I went looking for:
 - A widely-compatible private key store protocol (so I do not have to start all
   over again the next time the policy changes).
 
-  A smart-card and a smart-card reader seem a sensible choice: there are
+  A smartcard and a smartcard reader seem a sensible choice: there are
   widespread standards describing their protocol and they have been around for
   long enough in professional settings to have reasonable level of support in
   a lot of operating systems.
@@ -101,12 +102,12 @@ So I went looking for:
   plugged in for extended periods of time without having to worry about the
   untrusted machine using it behind my back.
 
-  Smart-cards rely on PINs, which, while they can be changed, I am sure nobody
-  change after every single operation. So once I have input my PIN on the
-  untrusted computer, what's stopping it from reusing the PIN for further
-  operations without my consent ?
+  Smartcards rely on PINs, which, while they can be changed, I am sure nobody
+  change after every single operation, much less from a trusted terminal. So
+  once I have input my PIN on the untrusted computer, what's stopping it from
+  reusing the PIN for further operations without my consent ?
 
-  So I need some form of TOTP, but smart-cards do not have an RTC (...that I
+  So I need some form of TOTP, but smartcards do not have an RTC (...that I
   know of), which means they are not aware of time, so they cannot internally
   produce something which can be both unpredictable to an attacker *and*
   predictable to a TOTP display where the user can tell what the current
@@ -228,7 +229,7 @@ file selection     full DF, partial DF,   short file identifier
 Usage information
 -----------------
 
-For the end-user:
+For end-users:
 
 Initial PIN values:
 
@@ -241,4 +242,4 @@ Initial key format:
 - sign, authenticate: ED25519
 - decrypt: X25519
 
-For the developer: see examples/* .
+For developers: see examples/* .
