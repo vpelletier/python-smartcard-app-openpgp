@@ -1554,7 +1554,7 @@ class PINQueueConnection(ZODB.Connection.Connection):
 
     def setstate(self, obj):
         super().setstate(obj)
-        if isintance(obj, OpenPGPRandomPassword):
+        if isinstance(obj, OpenPGPRandomPassword):
             obj.setPinQueue(self.__pin_queue)
 
 class OpenPGPRandomPassword(OpenPGP):
