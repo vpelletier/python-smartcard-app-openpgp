@@ -225,7 +225,11 @@ class SubprocessICCD(ConfigFunctionFFSSubprocess):
         class DB(ZODB.DB):
             klass = functools.partial(
                 PINQueueConnection,
-                pin_queue=function.pin_queue,
+                openpgp_kw={
+                    'pin_queue': function.pin_queue,
+                    'row_name_set': DISPLAY_ROW_NAME,
+                    'column_name_set': DISPLAY_COLUMN_NAME,
+                },
             )
         db = DB(
             storage=ZODB.FileStorage.FileStorage(

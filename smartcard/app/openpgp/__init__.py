@@ -1549,13 +1549,13 @@ class PINQueueConnection(ZODB.Connection.Connection):
     See OpenPGPRandomPassword.
     """
     def __init__(self, *args, **kw):
-        self.__pin_queue = kw.pop('pin_queue')
+        self.__openpgp_kw = kw.pop('openpgp_kw')
         super().__init__(*args, **kw)
 
     def setstate(self, obj):
         super().setstate(obj)
         if isinstance(obj, OpenPGPRandomPassword):
-            obj.setPinQueue(self.__pin_queue)
+            obj.setPinQueue(**self.__openpgp_kw)
 
 class OpenPGPRandomPassword(OpenPGP):
     """
@@ -1578,7 +1578,11 @@ class OpenPGPRandomPassword(OpenPGP):
         class DB(ZODB.DB.DB):
             klass = functools.partial(
                 PINQueueConnection,
-                pin_queue=function.pin_queue,
+                openpgp_kw={
+                    'pin_queue': some_deque,
+                    'row_name_set': ('A', 'B', 'C'),
+                    'column_name_set': ('1', '2', '3'),
+                },
             )
         db = DB(
             storage=ZODB.FileStorage.FileStorage(
@@ -1602,8 +1606,10 @@ class OpenPGPRandomPassword(OpenPGP):
         return result
 
     _v_pin_queue = None
-    def setPinQueue(self, pin_queue):
+    def setPinQueue(self, pin_queue, row_name_set, column_name_set):
         self._v_pin_queue = pin_queue
+        self._v_row_name_set = row_name_set
+        self._v_column_name_set = column_name_set
 
     def _getReferenceDataSet(self, index):
         secret = super()._getReferenceDataSet(index=index)
@@ -1617,7 +1623,7 @@ class OpenPGPRandomPassword(OpenPGP):
             secret = []
             while True:
                 try:
-                    item = pin_queue.popleft()
+                    item = selv._v_pin_queue.popleft()
                 except IndexError:
                     break
                 secret.append(item[cell_id].encode('utf-8'))
@@ -1637,9 +1643,9 @@ class OpenPGPRandomPassword(OpenPGP):
             column = row = None
             for character in value[:2]:
                 character = character.upper()
-                if character in DISPLAY_ROW_NAME:
+                if character in self._v_row_name_set:
                     row = character
-                elif character in DISPLAY_COLUMN_NAME:
+                elif character in self._v_column_name_set:
                     column = character
                 else:
                     raise WrongParameterInCommandData(repr(value))
