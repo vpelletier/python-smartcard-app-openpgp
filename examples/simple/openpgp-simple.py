@@ -17,7 +17,9 @@
 # along with python-smartcard-app-openpgp.  If not, see <http://www.gnu.org/licenses/>.
 
 import functools
+import logging
 import os
+import sys
 from functionfs.gadget import (
     GadgetSubprocessManager,
     ConfigFunctionFFSSubprocess,
@@ -32,6 +34,8 @@ from smartcard import (
 from smartcard.app.openpgp import OpenPGP
 from smartcard.utils import transaction_manager
 
+logger = logging.getLogger()
+
 class SubprocessICCD(ConfigFunctionFFSSubprocess):
     # Any 2-bytes value is fine, this is not what is used to
     # select the application.
@@ -42,7 +46,7 @@ class SubprocessICCD(ConfigFunctionFFSSubprocess):
         self.__zodb_path = zodb_path
 
     def run(self):
-        print('Initialising the database...')
+        logger.info('Initialising the database...')
         function = self.function
         db = ZODB.DB(
             storage=ZODB.FileStorage.FileStorage(
@@ -50,7 +54,7 @@ class SubprocessICCD(ConfigFunctionFFSSubprocess):
             ),
             pool_size=1,
         )
-        print('Opening a connection to the database...')
+        logger.info('Opening a connection to the database...')
         connection = db.open(
             transaction_manager=transaction_manager,
         )
@@ -59,7 +63,9 @@ class SubprocessICCD(ConfigFunctionFFSSubprocess):
             try:
                 card = root.card
             except AttributeError:
-                print('Database does not contain a card, building an new one...')
+                logger.info(
+                    'Database does not contain a card, building an new one...',
+                )
                 with transaction_manager:
                     card = root.card = Card(
                         name='py-openpgp'.encode('ascii'),
@@ -73,13 +79,12 @@ class SubprocessICCD(ConfigFunctionFFSSubprocess):
                         openpgp,
                     )
             else:
-                print('Card data found, using it.')
-            print('Inserting the OpenPGP card into slot 0...')
+                logger.info('Card data found, using it.')
+            logger.info('Inserting the OpenPGP card into slot 0...')
             function.slot_list[0].insert(card)
-            print('All ready, serving until keyboard interrupt')
+            logger.info('All ready, serving until keyboard interrupt')
             super().run()
         finally:
-            print('f_ccid exiting')
             connection.close()
             db.close()
 
@@ -97,7 +102,21 @@ def main():
         '--serial',
         help='String to use as USB device serial number',
     )
+    parser.add_argument(
+        '--verbose',
+        default='warning',
+        choices=['critical', 'error', 'warning', 'info', 'debug'],
+        help='Set verbosity level (default: %(default)s). '
+        'WARNING: "debug" level will display all APDU-level exchanges with '
+        'the host, which will include secret keys during import, PINs during '
+        'verification and modification, cipher- and clear-text for '
+        'en/decryption operations.',
+    )
     args = parser.parse_args()
+    logging.basicConfig(
+        level=args.verbose.upper(),
+        stream=sys.stderr,
+    )
     with (
         GadgetSubprocessManager(
             args=args,
@@ -133,10 +152,7 @@ def main():
             },
         ) as gadget
     ):
-        try:
-            gadget.waitForever()
-        finally:
-            print('gadget f_ccid exiting')
+        gadget.waitForever()
 
 if __name__ == '__main__':
     main()
