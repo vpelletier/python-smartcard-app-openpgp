@@ -367,13 +367,18 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         self.__blank()
 
     def __blank(self):
-        self.__reference_data_counter_list = persistent.list.PersistentList(
-            [VERIFICATION_DATA_VALIDITY] * 3,
-        )
         self.__reference_data_list = persistent.list.PersistentList([
             DEFAULT_PW1, # PW1
             DEFAULT_PW3, # PW3 (!)
             DEFAULT_RC,  # PW1 reset code
+        ])
+        self.__reference_data_counter_list = persistent.list.PersistentList([
+            (
+                0
+                if x is None else
+                VERIFICATION_DATA_VALIDITY
+            )
+            for x in self.__reference_data_list
         ])
         self.__key_list = persistent.list.PersistentList([None] * 3)
         self._v_key_list = [None] * 3
