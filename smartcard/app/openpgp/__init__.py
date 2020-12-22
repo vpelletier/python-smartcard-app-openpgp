@@ -17,11 +17,11 @@
 
 from collections import defaultdict
 import hmac
+import logging
 import random
 import struct
 import threading
 import time
-import traceback
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.hashes import (
     MD5,
@@ -147,6 +147,8 @@ from .tag import (
     OID_X25519,
     OID_ED25519,
 )
+
+logger = logging.getLogger(__name__)
 
 FSFE_RID = b'\xd2\x76\x00\x01\x24'
 FSFE_OPENPGP_PIX_APPLICATION = b'\x01'
@@ -1422,10 +1424,10 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                         before = time.time()
                         private_key = key_attributes_list[index].newKey()
                     except Exception: #pylint: disable=broad-except
-                        print('Error in keygen thread:', traceback.format_exc())
+                        logger.error('Error in keygen thread:', exc_info=1)
                         private_key = False
                     else:
-                        print(
+                        logger.debug(
                             'keygen: produced key %i in %.2fs' % (
                                 index,
                                 time.time() - before,
