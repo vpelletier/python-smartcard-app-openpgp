@@ -1635,7 +1635,7 @@ class OpenPGPRandomPassword(OpenPGP):
     def _setReferenceData(self, index, value):
         if index == PW1_INDEX:
             try:
-                value = value.decode('utf-8')
+                value = value.tobytes().decode('utf-8')
             except UnicodeDecodeError:
                 raise WrongParameterInCommandData(repr(value)) from None
             if set(value[2:]) != set(('0', )):
