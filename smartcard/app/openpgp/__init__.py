@@ -1638,7 +1638,7 @@ class OpenPGPRandomPassword(OpenPGP):
                 value = value.decode('utf-8')
             except UnicodeDecodeError:
                 raise WrongParameterInCommandData(repr(value)) from None
-            if set(value[2:]) != '0':
+            if set(value[2:]) != set(('0', )):
                 raise WrongParameterInCommandData(repr(value))
             column = row = None
             for character in value[:2]:
