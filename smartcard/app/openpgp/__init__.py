@@ -1428,10 +1428,9 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                         private_key = False
                     else:
                         logger.debug(
-                            'keygen: produced key %i in %.2fs' % (
-                                index,
-                                time.time() - before,
-                            ),
+                            'keygen: produced key %i in %.2fs',
+                            index,
+                            time.time() - before,
                         )
                     key_list[index] = private_key
 
