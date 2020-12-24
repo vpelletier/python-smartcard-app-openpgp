@@ -36,57 +36,79 @@ from smartcard.utils import transaction_manager
 
 logger = logging.getLogger()
 
-class SubprocessICCD(ConfigFunctionFFSSubprocess):
+class ICCDFunctionWithZODB(ICCDFunction):
     # Any 2-bytes value is fine, this is not what is used to
     # select the application.
-    OPENPGP_FILE_IDENTIFIER = b'\x12\x34'
+    __OPENPGP_FILE_IDENTIFIER = b'\x12\x34'
 
-    def __init__(self, zodb_path, **kw):
-        super().__init__(**kw)
+    def __init__(self, path, zodb_path, slot_count=1):
+        super().__init__(path=path, slot_count=slot_count)
         self.__zodb_path = zodb_path
 
-    def run(self):
+    def __enter__(self):
+        try:
+            result = super().__enter__()
+            self.__enter()
+            return result
+        except Exception:
+            self.__unenter()
+            raise
+
+    def __enter(self):
         logger.info('Initialising the database...')
-        function = self.function
-        db = ZODB.DB(
+        self.__db = db = ZODB.DB(
             storage=ZODB.FileStorage.FileStorage(
                 file_name=self.__zodb_path,
             ),
             pool_size=1,
         )
         logger.info('Opening a connection to the database...')
-        connection = db.open(
+        self.__connection = connection = db.open(
             transaction_manager=transaction_manager,
         )
+        root = connection.root
         try:
-            root = connection.root
-            try:
-                card = root.card
-            except AttributeError:
-                logger.info(
-                    'Database does not contain a card, building an new one...',
+            card = root.card
+        except AttributeError:
+            logger.info(
+                'Database does not contain a card, building an new one...',
+            )
+            with transaction_manager:
+                card = root.card = Card(
+                    name='py-openpgp'.encode('ascii'),
                 )
-                with transaction_manager:
-                    card = root.card = Card(
-                        name='py-openpgp'.encode('ascii'),
-                    )
-                    openpgp = OpenPGP(
-                        identifier=self.OPENPGP_FILE_IDENTIFIER,
-                    )
-                    openpgp.activateSelf()
-                    card.createFile(
-                        card.traverse((MASTER_FILE_IDENTIFIER, )),
-                        openpgp,
-                    )
-            else:
-                logger.info('Card data found, using it.')
-            logger.info('Inserting the OpenPGP card into slot 0...')
-            function.slot_list[0].insert(card)
-            logger.info('All ready, serving until keyboard interrupt')
-            super().run()
-        finally:
-            connection.close()
-            db.close()
+                openpgp = OpenPGPRandomPassword(
+                    identifier=self.__OPENPGP_FILE_IDENTIFIER,
+                )
+                openpgp.activateSelf()
+                card.createFile(
+                    card.traverse((MASTER_FILE_IDENTIFIER, )),
+                    openpgp,
+                )
+        else:
+            logger.info('Card data found, using it.')
+        self.__card = card
+        logger.info('Inserting the OpenPGP card into slot 0...')
+        # TODO: some way of removing/inserting multiple cards ?
+        # Ex: one card per thread with a threaded tranaction manager, and some
+        # UI on the gadget to let the user select the card to plug.
+        self.slot_list[0].insert(card)
+
+    def __unenter(self):
+        if self.__connection is not None:
+            self.__connection.close()
+            self.__connection = None
+        if self.__db is not None:
+            self.__db.close()
+            self.__db = None
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.__unenter()
+        return super().__exit__(exc_type, exc_value, traceback)
+
+    def processEventsForever(self):
+        logger.info('All ready, serving until keyboard interrupt')
+        super().processEventsForever()
 
 def main():
     parser = GadgetSubprocessManager.getArgumentParser(
@@ -125,11 +147,11 @@ def main():
                 {
                     'function_list': [
                         functools.partial(
-                            SubprocessICCD,
-                            zodb_path=os.path.abspath(args.filestorage),
+                            ConfigFunctionFFSSubprocess,
                             getFunction=functools.partial(
-                                ICCDFunction,
+                                ICCDFunctionWithZODB,
                                 slot_count=1,
+                                zodb_path=os.path.abspath(args.filestorage),
                             ),
                         ),
                     ],

@@ -79,9 +79,17 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
         'D': 4 * _line_height_with_margin,
     }
     _can_generate = False
+    __connection = None
+    __db = None
+    # Any 2-bytes value is fine, this is not what is used to
+    # select the application. We are using it internally to look it up.
+    __OPENPGP_FILE_IDENTIFIER = b'\x12\x34'
+    __PIN_GENERATION_DELAY = 30
+    __next_pin_generation = 0
 
-    def __init__(self, path, display, fontface, slot_count=1):
+    def __init__(self, path, zodb_path, display, fontface, slot_count=1):
         super().__init__(path=path, slot_count=slot_count)
+        self.__zodb_path = zodb_path
         self.__display = display
         self.__fontface = fontface
         self.__framebuffer = Framebuffer( # XXX: use PIL instead of custom framebuffer ?
@@ -92,7 +100,7 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
         )
         # Each item is a mapping from cell ids to contained PIN for the whole
         # generated table. Cell ids are a row name followed by a column name.
-        self.pin_queue = deque([], 2)
+        self.__pin_queue = deque([], 2)
 
     def updateDisplay(self, force_clean=False, wait=True):
         display = self.__display
@@ -131,7 +139,7 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
         # force_clean to wipe any PIN ghosting.
         self.updateDisplay(force_clean=True, wait=False)
 
-    def generatePinTable(self, tries_left, force=False):
+    def __generatePinTable(self, tries_left, force=False):
         if not self._can_generate and not force:
             return
         fb = self.__framebuffer
@@ -179,14 +187,77 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
                 color=Framebuffer.COLOR_OFF,
             )
         self.updateDisplay(wait=False)
-        self.pin_queue.append(pin_dict)
+        self.__pin_queue.append(pin_dict)
 
     def __enter__(self):
-        result = super().__enter__()
-        self.displayReadyUnplugged()
-        return result
+        try:
+            result = super().__enter__()
+            self.__enter()
+            return result
+        except Exception:
+            self.__unenter()
+            raise
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __enter(self):
+        self.displayReadyUnplugged()
+        logger.info('Initialising the database...')
+        # Note: access __pin_queue outside of DB declaration to get the
+        # intended __ mangling.
+        pin_queue = self.__pin_queue
+        class DB(ZODB.DB):
+            klass = functools.partial(
+                PINQueueConnection,
+                openpgp_kw={
+                    'pin_queue': pin_queue,
+                    'row_name_set': DISPLAY_ROW_NAME,
+                    'column_name_set': DISPLAY_COLUMN_NAME,
+                },
+            )
+        self.__db = db = DB(
+            storage=ZODB.FileStorage.FileStorage(
+                file_name=self.__zodb_path,
+            ),
+            pool_size=1,
+        )
+        logger.info('Opening a connection to the database...')
+        self.__connection = connection = db.open(
+            transaction_manager=transaction_manager,
+        )
+        root = connection.root
+        try:
+            card = root.card
+        except AttributeError:
+            logger.info(
+                'Database does not contain a card, building an new one...',
+            )
+            with transaction_manager:
+                card = root.card = Card(
+                    name='py-openpgp'.encode('ascii'),
+                )
+                openpgp = OpenPGPRandomPassword(
+                    identifier=self.__OPENPGP_FILE_IDENTIFIER,
+                )
+                openpgp.activateSelf()
+                card.createFile(
+                    card.traverse((MASTER_FILE_IDENTIFIER, )),
+                    openpgp,
+                )
+        else:
+            logger.info('Card data found, using it.')
+        self.__card = card
+        logger.info('Inserting the OpenPGP card into slot 0...')
+        # TODO: some way of removing/inserting multiple cards ?
+        # Ex: one card per thread with a threaded tranaction manager, and some
+        # UI on the gadget to let the user select the card to plug.
+        self.slot_list[0].insert(card)
+
+    def __unenter(self):
+        if self.__connection is not None:
+            self.__connection.close()
+            self.__connection = None
+        if self.__db is not None:
+            self.__db.close()
+            self.__db = None
         self.__framebuffer.blank(color=Framebuffer.COLOR_OFF)
         self.printAt(
             x=0,
@@ -194,7 +265,28 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             text="Exited", # TODO: better caption
         )
         self.updateDisplay(force_clean=True)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.__unenter()
         return super().__exit__(exc_type, exc_value, traceback)
+
+    def processEventsForever(self):
+        logger.info('All ready, serving until keyboard interrupt')
+        super().processEventsForever()
+
+    def processEvents(self):
+        super().processEvents()
+        now = time.time()
+        if self.__next_pin_generation <= now or not self.__pin_queue:
+            self.__next_pin_generation = now + self.__PIN_GENERATION_DELAY
+            with transaction_manager:
+                tries_left = self.__card.traverse(
+                    path=(MASTER_FILE_IDENTIFIER, self.__OPENPGP_FILE_IDENTIFIER),
+                ).getPIN1TriesLeft()
+            self.__generatePinTable(
+                tries_left=tries_left,
+            )
+            logger.info('Done')
 
     def onUnbind(self):
         self.displayReadyUnplugged()
@@ -203,107 +295,13 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
 
     def onEnable(self):
         self._can_generate = True
+        self.__next_pin_generation = 0
         super().onEnable()
 
     def onDisable(self):
         self.displayReadyUnplugged()
         self._can_generate = False
         super().onDisable()
-
-class SubprocessICCD(ConfigFunctionFFSSubprocess):
-    PIN_GENERATION_DELAY = 30
-    # Any 2-bytes value is fine, this is not what is used to
-    # select the application. We are using it internally to look it up.
-    OPENPGP_FILE_IDENTIFIER = b'\x12\x34'
-
-    def __init__(self, zodb_path, **kw):
-        super().__init__(**kw)
-        self.__zodb_path = zodb_path
-
-    def run(self):
-        logger.info('Initialising the database...')
-        function = self.function
-        class DB(ZODB.DB):
-            klass = functools.partial(
-                PINQueueConnection,
-                openpgp_kw={
-                    'pin_queue': function.pin_queue,
-                    'row_name_set': DISPLAY_ROW_NAME,
-                    'column_name_set': DISPLAY_COLUMN_NAME,
-                },
-            )
-        db = DB(
-            storage=ZODB.FileStorage.FileStorage(
-                file_name=self.__zodb_path,
-            ),
-            pool_size=1,
-        )
-        logger.info('Opening a connection to the database...')
-        connection = db.open(
-            transaction_manager=transaction_manager,
-        )
-        try:
-            root = connection.root
-            try:
-                card = root.card
-            except AttributeError:
-                logger.info('Database does not contain a card, building an new one...')
-                with transaction_manager:
-                    card = root.card = Card(
-                        name='py-openpgp'.encode('ascii'),
-                    )
-                    openpgp = OpenPGPRandomPassword(
-                        identifier=self.OPENPGP_FILE_IDENTIFIER,
-                    )
-                    openpgp.activateSelf()
-                    card.createFile(
-                        card.traverse((MASTER_FILE_IDENTIFIER, )),
-                        openpgp,
-                    )
-            else:
-                logger.info('Card data found, using it.')
-            # TODO: some way of removing/inserting multiple cards ?
-            # Ex: one card per thread with a threaded tranaction manager, and some
-            # UI on the gadget to let the user select the card to plug.
-            logger.info('Inserting the OpenPGP card into slot 0...')
-            function.slot_list[0].insert(card)
-            logger.info('All ready, serving until keyboard interrupt')
-            with select.epoll(1) as epoll:
-                epoll.register(function.eventfd, select.EPOLLIN)
-                poll = epoll.poll
-                processEvents = function.processEvents
-                next_pin_generation = 0
-                while True:
-                    now = time.time()
-                    if next_pin_generation <= now or not function.pin_queue:
-                        next_pin_generation = now + self.PIN_GENERATION_DELAY
-                        with transaction_manager:
-                            tries_left = card.traverse(
-                                path=(MASTER_FILE_IDENTIFIER, self.OPENPGP_FILE_IDENTIFIER),
-                            ).getPIN1TriesLeft()
-                        # Note: everytime PIN1 try count changes the pin queue
-                        # is flushed, so this should be sufficient.
-                        function.generatePinTable(
-                            tries_left=tries_left,
-                        )
-                    try:
-                        # XXX: set a timeout, to trigger PIN changes even when
-                        # there is no activity ?
-                        # Drawback: on the pi zero, the UDC cannot detect bus
-                        # disconnection, because the 5V rail is the USB VBUS
-                        # rail, so PIN generation never stops after initial
-                        # enumeration.
-                        event_list = poll()
-                    except OSError as exc:
-                        if exc.errno != errno.EINTR:
-                            raise
-                    else:
-                        processEvents()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            connection.close()
-            db.close()
 
 def main():
     parser = GadgetSubprocessManager.getArgumentParser(
@@ -343,14 +341,14 @@ def main():
                 {
                     'function_list': [
                         functools.partial(
-                            SubprocessICCD,
-                            zodb_path=os.path.abspath(args.filestorage),
+                            ConfigFunctionFFSSubprocess,
                             getFunction=functools.partial(
                                 ICCDFunctionWithRandomPinDisplay,
                                 display=display,
                                 # TODO: argument, auto-detection of default...
                                 fontface=freetype.Face('/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf'),
                                 slot_count=4,
+                                zodb_path=os.path.abspath(args.filestorage),
                             ),
                         ),
                     ],
