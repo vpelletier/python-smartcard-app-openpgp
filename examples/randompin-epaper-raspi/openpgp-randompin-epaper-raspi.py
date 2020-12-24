@@ -250,6 +250,19 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
         # Ex: one card per thread with a threaded tranaction manager, and some
         # UI on the gadget to let the user select the card to plug.
         self.slot_list[0].insert(card)
+        # XXX: Do slow operations now, to avoid timeouts later. Especially, the
+        # DWC2 accepts receiving transfer requests while USB bus is active, but
+        # rejects them at any other time - including when USB bus is suspended
+        # by host. This means than once the UDC is bound to the gadget, we are
+        # in a race against the HCD to submit our transfers before the USB idle
+        # delay expires.
+        logger.debug('Loading OpenPGP from database...')
+        with transaction_manager:
+            self.__card.traverse(
+                path=(MASTER_FILE_IDENTIFIER, self.__OPENPGP_FILE_IDENTIFIER),
+            ).getPIN1TriesLeft()
+        logger.debug('Waiting for screen to be ready...')
+        self.__display.wait()
 
     def __unenter(self):
         if self.__connection is not None:
