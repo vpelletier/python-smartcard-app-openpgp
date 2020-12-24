@@ -147,8 +147,13 @@ def main():
     )
     args = parser.parse_args()
     logging.basicConfig(
-        level=args.verbose.upper(),
         stream=sys.stderr,
+    )
+    logging.getLogger('smartcard').setLevel(
+        level=args.verbose.upper(),
+    )
+    logger.setLevel(
+        level=args.verbose.upper(),
     )
     with (
         GadgetSubprocessManager(
