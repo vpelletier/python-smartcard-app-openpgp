@@ -299,7 +299,6 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             self.__generatePinTable(
                 tries_left=tries_left,
             )
-            logger.info('Done')
 
     def onUnbind(self):
         self.displayReadyUnplugged()
