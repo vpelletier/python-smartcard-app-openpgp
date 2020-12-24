@@ -491,7 +491,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         return (ExtendedCapabilities.encode(
             value={
                 'secure_messaging_algorithm': ExtendedCapabilities.SECURE_MESSAGING_ALGORITHM_NONE, # TODO
-                'challenge_max_length': 0, # TODO: getChallenge
+                'challenge_max_length': 0xffff,
                 'has_key_import': True,
                 'has_editable_password_status': True,
                 'has_private_data_objects': True,
@@ -1659,3 +1659,14 @@ class OpenPGPRandomPassword(OpenPGP):
                 raise WrongParameterInCommandData(repr(value))
             value = (row + column).encode('utf-8')
         super()._setReferenceData(index=index, value=value)
+
+    def getChallenge(self, channel, p1, p2, command_data, response_len):
+        if p1 or p2 or command_data:
+            raise WrongParameterInCommandData(
+                'p1=%02x p2=%02x command_data=%s' % (
+                    p1,
+                    p2,
+                    command_data.hex(),
+                ),
+            )
+        return os.urandom(response_len) + SUCCESS
