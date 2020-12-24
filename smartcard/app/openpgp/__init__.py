@@ -1629,7 +1629,7 @@ class OpenPGPRandomPassword(OpenPGP):
             secret = []
             while True:
                 try:
-                    item = selv._v_pin_queue.popleft()
+                    item = self._v_pin_queue.popleft()
                 except IndexError:
                     break
                 secret.append(item[cell_id].encode('utf-8'))
