@@ -103,6 +103,14 @@ DeviceTree overlays, so there is some extra work needed:
     device_tree=bcm2835-rpi-zero-w_with-symbols.dtb
     dtoverlay=vanilla-enable-spi0.dtbo
 
+On the host (Linux)
+-------------------
+
+If the CCID card reader appears in lsusb byt gnupg (etc) do not see the card,
+you may need to add an udev rule like::
+
+  SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{ID_USB_INTERFACES}=="*:0b????:*", TAG+="uaccess"
+
 .. _usb-f-ccid: https://github.com/vpelletier/python-usb-f-ccid
 .. _smartcard-app-openpgp: https://github.com/vpelletier/python-smartcard-app-openpgp
 .. _WaveShare 2.13 inches e-Paper display: https://www.waveshare.com/wiki/2.13inch_e-Paper_HAT
