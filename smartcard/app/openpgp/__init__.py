@@ -1323,8 +1323,14 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             role=KEY_ROLE_DECRYPT,
         )
         if isinstance(private_key, RSAPrivateKey):
+            if ciphertext[0] != 0: # 0 == RSA
+                raise WrongParameterInCommandData(
+                    'unexpected padding byte: %02x' % (
+                        ciphertext[0],
+                    ),
+                )
             plaintext = private_key.decrypt(
-                ciphertext=ciphertext,
+                ciphertext=bytes(ciphertext[1:]),
                 padding=PKCS1v15(),
             )
         elif isinstance(private_key, EllipticCurvePrivateKey):
@@ -1335,13 +1341,13 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                         channel=channel,
                         role=KEY_ROLE_DECRYPT,
                     )['parameter_dict']['algo'],
-                    data=self._getECPeerPublicKey(ciphertext=ciphertext),
+                    data=self._getECPeerPublicKey(ciphertext=bytes(ciphertext)),
                 ),
             )
         elif isinstance(private_key, X25519PrivateKey):
             plaintext = private_key.exchange(
                 peer_public_key=X25519PublicKey.from_public_bytes(
-                    data=self._getECPeerPublicKey(ciphertext=ciphertext),
+                    data=self._getECPeerPublicKey(ciphertext=bytes(ciphertext)),
                 ),
             )
         else:
