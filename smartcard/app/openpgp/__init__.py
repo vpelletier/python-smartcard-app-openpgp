@@ -1259,10 +1259,10 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             raw_condensate = digest_info_dict['condensate']
             # condensate must not be longer than 40% of the key modulus
             if len(raw_condensate) * 8 > private_key.key_size * .4:
-                raise WrongParameterInCommandData
+                raise WrongParameterInCommandData(len(raw_condensate))
             oid = digest_info_dict['oid']
             if oid not in HASH_OID_DICT:
-                raise WrongParameterInCommandData
+                raise WrongParameterInCommandData(oid.bytes())
             signature = private_key.sign(
                 data=bytes(raw_condensate),
                 padding=PKCS1v15(),
