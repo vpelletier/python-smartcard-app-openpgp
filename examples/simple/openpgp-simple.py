@@ -34,7 +34,7 @@ from smartcard import (
 from smartcard.app.openpgp import OpenPGP
 from smartcard.utils import transaction_manager
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 class ICCDFunctionWithZODB(ICCDFunction):
     # Any 2-bytes value is fine, this is not what is used to

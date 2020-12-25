@@ -46,7 +46,7 @@ from smartcard.utils import transaction_manager
 from framebuffer import Framebuffer
 from waveshare_epaper import WaveShareEPaper
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 # Periodically, generate new PINs, all the time that the device is enumerated by
 # a host (...and the OpenPGP application is unghostified in ZODB object cache).
