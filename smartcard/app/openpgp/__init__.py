@@ -1153,12 +1153,23 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
 
     def _changeReferenceData(self, index, new_reference):
         new_reference_len = len(new_reference)
-        if new_reference_len < self.__reference_min_length_list[index]:
+        if (
+            (
+                # Tolerate setting an empty reference for the reset code
+                new_reference or
+                index != RESET_CODE_INDEX
+            ) and
+            new_reference_len < self.__reference_min_length_list[index]
+        ):
             raise WrongParameterInCommandData('Too short')
         if new_reference_len > 0x7f:
             raise WrongParameterInCommandData('Too long')
         self._setReferenceData(index=index, value=bytes(new_reference))
-        self.__reference_data_counter_list[index] = VERIFICATION_DATA_VALIDITY
+        self.__reference_data_counter_list[index] = (
+            VERIFICATION_DATA_VALIDITY
+            if new_reference else
+            0
+        )
 
     def verify(self, channel, level, command_data):
         try:
