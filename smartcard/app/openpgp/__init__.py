@@ -1153,7 +1153,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             raise WrongParameterInCommandData('Too short')
         if new_reference_len > 0x7f:
             raise WrongParameterInCommandData('Too long')
-        self._setReferenceData(index=index, value=new_reference)
+        self._setReferenceData(index=index, value=bytes(new_reference))
         self.__reference_data_counter_list[index] = VERIFICATION_DATA_VALIDITY
 
     def verify(self, channel, level, command_data):
