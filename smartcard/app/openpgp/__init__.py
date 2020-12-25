@@ -63,6 +63,7 @@ from smartcard.status import (
     APDUException,
     AuthMethodBlocked,
     RecordNotFound,
+    ReferenceDataNotFound,
     ReferenceDataNotUsable,
     SecurityNotSatisfied,
     WarnPersistentChanged,
@@ -1503,7 +1504,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                 ),
             )]
         else:
-            raise RecordNotFound
+            raise ReferenceDataNotFound
         return CodecBER.encode(
             tag=PublicKeyComponents,
             value=component_list,
