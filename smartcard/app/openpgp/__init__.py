@@ -1444,6 +1444,11 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                         )
                     key_list[index] = private_key
 
+    def _getKeygenPrivateKey(self, index):
+        private_key = self._v_s_keygen_key_list[index]
+        if private_key is None:
+            raise ValueError('key not ready yet')
+
     def generateAsymmetricKeyPair(self, channel, p1, p2, command_data):
         if p2:
             raise WrongParametersP1P2('p2=%02x' % (p2, ))
@@ -1459,10 +1464,8 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         index = KEY_ROLE_TO_INDEX_DICT[role]
         if p1 == 0x80:
             channel.checkUserAuthentication(level=LEVEL_PW3)
-            private_key = self._v_s_keygen_key_list[index]
-            if private_key is None:
-                raise ValueError('key not ready yet')
-            elif private_key is False:
+            private_key = self._getKeygenPrivateKey(index=index)
+            if private_key is False:
                 raise ValueError('key generation failed (unsupported format ?)')
             self._v_s_keygen_key_list[index] = None
             self._v_s_keygen_semaphore.release()
