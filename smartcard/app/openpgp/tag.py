@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with python-smartcard-app-openpgp.  If not, see <http://www.gnu.org/licenses/>.
 
+import functools
 import itertools
 import struct
 from cryptography.hazmat.primitives.asymmetric.rsa import (
@@ -513,6 +514,7 @@ OID_X25519         = ObjectIdentifier.encode('1.3.6.1.4.1.3029.1.5.1'           
 OID_ED25519        = ObjectIdentifier.encode('1.3.6.1.4.1.11591.15.1'                      , codec=None)
 
 class AlgorithmAttributesBase(_PrivateSimpleBase):
+    @functools.total_ordering
     class AlgorithmBase:
         @classmethod
         def encode(cls, value):
@@ -534,6 +536,15 @@ class AlgorithmAttributesBase(_PrivateSimpleBase):
 
         def newKey(self):
             raise NotImplementedError
+
+        def __eq__(self, other):
+            return (
+                type(self) == type(other) and
+                self._format_dict == other._format_dict
+            )
+
+        def __lt__(self, other):
+            return NotImplemented
 
     class RSA(AlgorithmBase):
         ID = 0x01

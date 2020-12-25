@@ -1432,13 +1432,18 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         semaphore = self._v_s_keygen_semaphore
         key_list = self._v_s_keygen_key_list
         key_attributes_list = self._v_s_algorithm_attributes_list
+        retry = False
         while True:
-            semaphore.acquire()
+            if retry:
+                retry = False
+            else:
+                semaphore.acquire()
             for index, key in enumerate(key_list):
                 if key is None:
+                    attributes = key_attributes_list[index]
                     try:
                         before = time.time()
-                        private_key = key_attributes_list[index].newKey()
+                        private_key = attributes.newKey()
                     except Exception: #pylint: disable=broad-except
                         logger.error('Error in keygen thread:', exc_info=1)
                         private_key = False
@@ -1448,6 +1453,12 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                             index,
                             time.time() - before,
                         )
+                        if attributes != key_attributes_list[index]:
+                            logger.debug(
+                                'keygen: ...but parameters changed, discarding',
+                            )
+                            retry = True
+                            continue
                     key_list[index] = private_key
 
     def _getKeygenPrivateKey(self, index):
