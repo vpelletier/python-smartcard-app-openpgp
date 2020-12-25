@@ -77,7 +77,7 @@ class ICCDFunctionWithZODB(ICCDFunction):
                 card = root.card = Card(
                     name='py-openpgp'.encode('ascii'),
                 )
-                openpgp = OpenPGPRandomPassword(
+                openpgp = OpenPGP(
                     identifier=self.__OPENPGP_FILE_IDENTIFIER,
                 )
                 openpgp.activateSelf()
