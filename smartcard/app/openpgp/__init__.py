@@ -394,7 +394,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             # Termination security is handled in terminate().
             terminate=SECURITY_CONDITION_ALLOW,
         )
-        self._setSex(Sex.UNKNOWN)
+        self._setSex(Sex.NOT_ANNOUNCED)
         self.putData(
             tag=AlgorithmAttributesSignature,
             value=DEFAULT_ALGORITHM_ATTRIBUTES_SIGNATURE,
@@ -567,8 +567,9 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             Sex,
         ):
             value = self.getData(tag=tag, decode=False)
-            if value is not None:
-                result.append(CodecBER.wrapValue(tag, value))
+            if value is None:
+                value = b''
+            result.append(CodecBER.wrapValue(tag, value))
         return (b''.join(result), )
 
     def _getHistoricalData(self):
@@ -629,7 +630,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
     def _getFingerprints(self):
         return (
             b''.join(
-                self.getData(tag=tag, decode=False)
+                self.getData(tag=tag, decode=False) or EMPTY_FINGERPRINT
                 for tag in (
                     SignatureKeyFingerprint,
                     DecryptionKeyFingerprint,
@@ -641,7 +642,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
     def _getCAFingerprints(self):
         return (
             b''.join(
-                self.getData(tag=tag, decode=False)
+                self.getData(tag=tag, decode=False) or EMPTY_FINGERPRINT
                 for tag in (
                     CAFingerprint1,
                     CAFingerprint2,
@@ -653,7 +654,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
     def _getKeyTimestamps(self):
         return (
             b''.join(
-                self.getData(tag=tag, decode=False)
+                self.getData(tag=tag, decode=False) or EMPTY_TIMESTAMP
                 for tag in (
                     SignatureKeyTimestamp,
                     DecryptionKeyTimestamp,
@@ -778,12 +779,6 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         #raise WrongParameterInCommandData
         self._putData(tag=tag, value=value, index=index)
         key_index = KEY_ROLE_TO_INDEX_DICT[role]
-        tag_fingerprint, tag_ca_fingerprint, tag_timestamp = (
-            ALGORITHM_ATTRIBUTES_TO_FINGERPRINT_AND_CA_AND_TIMESTAMP[tag]
-        )
-        self._putData(tag=tag_fingerprint, value=EMPTY_FINGERPRINT, index=index)
-        self._putData(tag=tag_ca_fingerprint, value=EMPTY_FINGERPRINT, index=index)
-        self._putData(tag=tag_timestamp, value=EMPTY_TIMESTAMP, index=index)
         self._storePrivateKey(
             role=role,
             key=None,
