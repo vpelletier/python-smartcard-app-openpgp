@@ -530,6 +530,14 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             ),
         )
 
+    def _getSignatureCounter(self):
+        return (
+            SignatureCounter.encode(
+                value=self.__signature_counter,
+                codec=CodecBER,
+            ),
+        )
+
     def _getApplicationLabel(self):
         return (b'OPENPGP', )
 
@@ -692,6 +700,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         result[ExtendedCapabilities] = '_getExtendedCapabilities'
         result[PasswordStatusBytes] = '_getPasswordStatusBytes'
         result[SecuritySupportTemplate] = '_getSecuritySupportTemplate'
+        result[SignatureCounter] = '_getSignatureCounter'
         result[ApplicationLabel] = '_getApplicationLabel'
         result[ApplicationRelatedData] = '_getApplicationRelatedData'
         result[HistoricalData] = '_getHistoricalData'
@@ -992,8 +1001,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                 CardholderCertificate:             DATA_OBJECT_GET_ALWAYS_PUT_PW3,
                 ExtendedLengthInformation:         DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
                 #TAG_GENERAL_FEATURE_MANAGEMENT:    DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
-                # Signature counter is a context object, supposed to be returned as part of a SecuritySupportTemplate
-                #SignatureCounter:                  DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
+                SignatureCounter:                  DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
                 ExtendedCapabilities:              DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
                 AlgorithmAttributesSignature:      DATA_OBJECT_GET_ALWAYS_PUT_PW3,
                 AlgorithmAttributesDecryption:     DATA_OBJECT_GET_ALWAYS_PUT_PW3,
