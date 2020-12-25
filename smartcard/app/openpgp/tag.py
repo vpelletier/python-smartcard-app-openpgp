@@ -292,6 +292,30 @@ class CardholderPrivateKeyTemplate(_ApplicationBase):
             schema=cls.__schema,
         ))
 
+class CardholderPrivateKeyTemplateExtendedHeader(TypeListBase):
+    # Note: no identifier. This is not to be decoded as part of a Data Object,
+    # but a helper to decode the payload of an Extended Header List.
+    min_length = 3
+
+    @classmethod
+    def iterItemSchema(cls):
+        return [
+            {
+                x.asTagTuple(): x
+                for x in (
+                    ControlReferenceTemplateAuthentication,
+                    ControlReferenceTemplateSignature,
+                    ControlReferenceTemplateDecryption,
+                )
+            },
+            {
+                CardholderPrivateKeyTemplate.asTagTuple(): CardholderPrivateKeyTemplate,
+            },
+            {
+                CardholderPrivateKey.asTagTuple(): CardholderPrivateKey,
+            },
+        ]
+
 class PublicKeyComponents(_ApplicationCompositeBase):
     identifier = 0x49
 
@@ -585,12 +609,12 @@ class AlgorithmAttributesBase(_PrivateSimpleBase):
             raise ValueError('E and M are not coprimes')
 
         def importKey(self, component_dict):
-            e = component_dict[CardholderPrivateKeyTemplate.PublicExponent]
+            e = int.from_bytes(component_dict[CardholderPrivateKeyTemplate.PublicExponent], 'big')
             # XXX: check public exponent length/value ?
-            p = component_dict[CardholderPrivateKeyTemplate.Prime1]
-            q = component_dict[CardholderPrivateKeyTemplate.Prime2]
+            p = int.from_bytes(component_dict[CardholderPrivateKeyTemplate.Prime1], 'big')
+            q = int.from_bytes(component_dict[CardholderPrivateKeyTemplate.Prime2], 'big')
             try:
-                n = component_dict[CardholderPrivateKeyTemplate.Modulus]
+                n = int.from_bytes(component_dict[CardholderPrivateKeyTemplate.Modulus], 'big')
             except KeyError:
                 n = p * q
             # modulus is over 10 bits shorter than expected, reject the key.
@@ -599,15 +623,15 @@ class AlgorithmAttributesBase(_PrivateSimpleBase):
                 raise ValueError
             d = self.__modularInverse(e, (p - 1) * (q - 1))
             try:
-                dmp1 = component_dict[CardholderPrivateKeyTemplate.DP1]
+                dmp1 = int.from_bytes(component_dict[CardholderPrivateKeyTemplate.DP1], 'big')
             except KeyError:
                 dmp1 = rsa_crt_dmp1(private_exponent=d, p=p)
             try:
-                dmq1 = component_dict[CardholderPrivateKeyTemplate.DQ1]
+                dmq1 = int.from_bytes(component_dict[CardholderPrivateKeyTemplate.DQ1], 'big')
             except KeyError:
                 dmq1 = rsa_crt_dmq1(private_exponent=d, q=q)
             try:
-                iqmp = component_dict[CardholderPrivateKeyTemplate.PQ]
+                iqmp = int.from_bytes(component_dict[CardholderPrivateKeyTemplate.PQ], 'big')
             except KeyError:
                 iqmp = rsa_crt_iqmp(p=p, q=q)
             return RSAPrivateNumbers(

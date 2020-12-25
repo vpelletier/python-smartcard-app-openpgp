@@ -111,6 +111,7 @@ from .tag import (
     CardholderCertificate,
     CardholderPrivateKey,
     CardholderPrivateKeyTemplate,
+    CardholderPrivateKeyTemplateExtendedHeader,
     Cipher,
     CONTROL_REFERENCE_SCHEMA,
     ControlReferenceTemplateAuthentication,
@@ -710,20 +711,12 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         _ = index # Silence pylint.
         try:
             (
-                (key_role_tag, _),
+                (key_role_tag, _), # TODO: add support for extended format
                 (_, key_headers_value),
                 (_, key_data_value),
-            ) = CodecBER.decode(
-                value,
-                schema=[
-                    CONTROL_REFERENCE_SCHEMA,
-                    {
-                        CardholderPrivateKeyTemplate.asTagTuple(): CardholderPrivateKeyTemplate,
-                    },
-                    {
-                        CardholderPrivateKey.asTagTuple(): CardholderPrivateKey,
-                    },
-                ],
+            ) = CardholderPrivateKeyTemplateExtendedHeader.decode(
+                value=value,
+                codec=CodecBER,
             )
         except ValueError:
             raise WrongParameterInCommandData from None
@@ -736,16 +729,26 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             component_data = key_data_value[:component_length]
             if len(component_data) != component_length:
                 raise WrongParameterInCommandData
-            component_dict[component_tag] = int.from_bytes(component_data, 'big')
+            if component_tag in component_dict:
+                raise WrongParameterInCommandData(
+                    'multiple occurrences of key component %r' % (
+                        component_tag,
+                    ),
+                )
+            component_dict[component_tag] = component_data
             key_data_value = key_data_value[component_length:]
         if key_data_value:
             raise WrongParameterInCommandData
+        key_attribute_tag = KEY_ROLE_TO_ATTRIBUTE_TAG_DICT[role]
         self._storePrivateKey(
             role=role,
-            key=self.getData(
-                KEY_ROLE_TO_ATTRIBUTE_TAG_DICT[role],
-                decode=True,
-            )['algorithm'].importKey(
+            key=key_attribute_tag.getAlgorithmObject( # XXX: could be simpler...
+                value=self.getData(
+                    key_attribute_tag,
+                    decode=False,
+                ),
+                codec=CodecBER,
+            ).importKey(
                 component_dict=component_dict,
             ),
             information=KEY_INFORMATION_IMPORTED_TO_CARD,
@@ -961,8 +964,8 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                 ApplicationRelatedData:            DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
                 ApplicationLabel:                  DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
                 SecuritySupportTemplate:           DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
+                ExtendedHeaderList:                DATA_OBJECT_GET_NEVER_PUT_PW3, # Key import
                 #TAG_DISCRETIONARY_DATA_OBJECT:
-                #ExtendedHeaderList: TODO
                 #TAG_CARD_HOLDER_PRIVATE_KEY_TEMPLATE: ??? (only used for encapsulation type and not as DO ?)
                 Private1: ((FileSecurityCompactFormat, {
                     FileSecurityCompactFormat.GET: SECURITY_CONDITION_ALLOW,
