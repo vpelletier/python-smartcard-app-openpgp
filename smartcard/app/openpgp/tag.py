@@ -296,7 +296,7 @@ class CardholderPrivateKeyTemplate(_ApplicationBase):
 class CardholderPrivateKeyTemplateExtendedHeader(TypeListBase):
     # Note: no identifier. This is not to be decoded as part of a Data Object,
     # but a helper to decode the payload of an Extended Header List.
-    min_length = 3
+    min_length = 1
 
     @classmethod
     def iterItemSchema(cls):

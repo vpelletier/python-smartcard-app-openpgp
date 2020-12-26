@@ -720,40 +720,42 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
 
     def _setExtendedHeaderList(self, value, index=None):
         _ = index # Silence pylint.
-        try:
-            (
-                (key_role_tag, _), # TODO: add support for extended format
-                (_, key_headers_value),
-                (_, key_data_value),
-            ) = CardholderPrivateKeyTemplateExtendedHeader.decode(
-                value=value,
-                codec=CodecBER,
-            )
-        except ValueError:
-            raise WrongParameterInCommandData from None
+        private_key_template = CardholderPrivateKeyTemplateExtendedHeader.decode(
+            value=value,
+            codec=CodecBER,
+        )
+        # TODO: add support for extended format
+        key_role_tag, _ = private_key_template[0]
         try:
             role = KEY_TAG_TO_ROLE_DICT[key_role_tag]
         except KeyError:
             raise WrongParameterInCommandData from None
-        component_dict = {}
-        for component_tag, component_length in key_headers_value:
-            component_data = key_data_value[:component_length]
-            if len(component_data) != component_length:
+        if len(private_key_template) == 1:
+            # key removal
+            private_key = None
+        else:
+            (
+                (_, key_headers_value),
+                (_, key_data_value),
+            ) = private_key_template[1:]
+            component_dict = {}
+            for component_tag, component_length in key_headers_value:
+                component_data = key_data_value[:component_length]
+                if len(component_data) != component_length:
+                    raise WrongParameterInCommandData
+                if component_tag in component_dict:
+                    raise WrongParameterInCommandData(
+                        'multiple occurrences of key component %r' % (
+                            component_tag,
+                        ),
+                    )
+                component_dict[component_tag] = component_data
+                key_data_value = key_data_value[component_length:]
+            if key_data_value:
                 raise WrongParameterInCommandData
-            if component_tag in component_dict:
-                raise WrongParameterInCommandData(
-                    'multiple occurrences of key component %r' % (
-                        component_tag,
-                    ),
-                )
-            component_dict[component_tag] = component_data
-            key_data_value = key_data_value[component_length:]
-        if key_data_value:
-            raise WrongParameterInCommandData
-        key_attribute_tag = KEY_ROLE_TO_ATTRIBUTE_TAG_DICT[role]
-        self._storePrivateKey(
-            role=role,
-            key=key_attribute_tag.getAlgorithmObject( # XXX: could be simpler...
+            # XXX: could be simpler...
+            key_attribute_tag = KEY_ROLE_TO_ATTRIBUTE_TAG_DICT[role]
+            private_key = key_attribute_tag.getAlgorithmObject(
                 value=self.getData(
                     key_attribute_tag,
                     decode=False,
@@ -761,7 +763,10 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                 codec=CodecBER,
             ).importKey(
                 component_dict=component_dict,
-            ),
+            )
+        self._storePrivateKey(
+            role=role,
+            key=private_key,
             information=KEY_INFORMATION_IMPORTED_TO_CARD,
         )
 
