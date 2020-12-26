@@ -1140,10 +1140,16 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             reference_data=reference_data,
         )
         for secret in secret_set:
-            secret_byte_length = len(secret)
-            if truncate:
-                command_data = command_data[:secret_byte_length]
-            if hmac.compare_digest(secret, command_data):
+            if hmac.compare_digest(
+                secret,
+                bytes(
+                    # XXX: does this allow a timing attack to guess secret's
+                    # length ?
+                    command_data[:len(secret)]
+                    if truncate else
+                    command_data
+                ),
+            ):
                 break
         else:
             raise SecurityNotSatisfied
