@@ -1104,7 +1104,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
     def _getReferenceDataSet(self, index):
         secret = self.__reference_data_list[index]
         if secret is None:
-            raise ReferenceDataNotUsable
+            return ()
         return (secret, )
 
     def _setReferenceData(self, index, value):
@@ -1128,6 +1128,8 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         if self.__reference_data_counter_list[index] == 0:
             raise AuthMethodBlocked
         secret_set = self._getReferenceDataSet(index=index)
+        if not secret_set:
+            raise ReferenceDataNotUsable
         self.__reference_data_counter_list[index] -= 1
 
         transaction_manager.commit()
