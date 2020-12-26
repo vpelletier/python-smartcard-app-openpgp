@@ -852,15 +852,16 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             self.__pw1_valid_multiple_signatures = value == b'\x01'
 
     def _setSex(self, value, index=None):
-        try:
-            Sex.decode(value, codec=CodecBER)
-        except ValueError:
-            raise WrongParameterInCommandData from None
+        if value:
+            try:
+                Sex.decode(value, codec=CodecBER)
+            except ValueError:
+                raise WrongParameterInCommandData from None
         self._putData(tag=Sex, value=value, index=index)
 
     def _setFingerprint(self, tag, value, index=None):
-        if len(value) != 20:
-            raise WrongParameterInCommandData
+        if len(value) not in (0, 20):
+            raise WrongParameterInCommandData(len(value))
         self._putData(tag=tag, value=value, index=index)
 
     def _setSignatureFingerprint(self, value, index=None):
@@ -894,8 +895,8 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         self._setCAFingerprint1(value[:20], index=index)
 
     def _setKeyTimestamp(self, tag, value, index=None):
-        if len(value) != 4:
-            raise WrongParameterInCommandData
+        if len(value) not in (0, 4):
+            raise WrongParameterInCommandData(len(value))
         self._putData(tag=tag, value=value, index=index)
 
     def _setSignatureKeyTimestamp(self, value, index=None):
