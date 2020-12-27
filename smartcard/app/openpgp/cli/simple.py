@@ -39,6 +39,8 @@ class ICCDFunctionWithZODB(ICCDFunction):
     # Any 2-bytes value is fine, this is not what is used to
     # select the application.
     __OPENPGP_FILE_IDENTIFIER = b'\x12\x34'
+    __connection = None
+    __db = None
 
     def __init__(self, path, zodb_path, slot_count=1):
         super().__init__(path=path, slot_count=slot_count)
