@@ -45,7 +45,6 @@ fom a virtualenv at `/opt/smartcard-openpgp`):
 
     [Unit]
     Description=Behave like a CCID + smartcard combo USB device
-    Requisite=usb-gadget.target
 
     [Service]
     ExecStart=/opt/smartcard-openpgp/bin/smartcard-openpgp-simple \
@@ -53,7 +52,7 @@ fom a virtualenv at `/opt/smartcard-openpgp`):
       --filestorage /srv/smartcard-openpgp/card.fs
 
     [Install]
-    WantedBy=multi-user.target
+    WantedBy=usb-gadget.target
 
 - create a system user, enable the systemd service, and start it:
 
