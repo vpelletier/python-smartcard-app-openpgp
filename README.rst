@@ -24,6 +24,220 @@ SENSIBLE OR VALUABLE DATA**, and **DO NOT IMPORT VALUABLE KEYS IN IT**.
 
 This code is in dire need for reviewing and testing.
 
+Installation
+------------
+
+No extra hardware requirements
+++++++++++++++++++++++++++++++
+
+To get a standard card, with an executable setting up a gadget.
+
+.. code:: shell
+
+  pip install smartcard-app-openpgp[ccid]
+
+Then, you may set it up to automatically start on boot (assuming `pip` comes
+fom a virtualenv at `/opt/smartcard-openpgp`):
+
+- create a systemd service:
+
+  .. code:: ini
+
+    [Unit]
+    Description=Behave like a CCID + smartcard combo USB device
+    Requisite=usb-gadget.target
+
+    [Service]
+    ExecStart=/opt/smartcard-openpgp/bin/smartcard-openpgp-simple \
+      --user smartcard-openpgp \
+      --filestorage /srv/smartcard-openpgp/card.fs
+
+    [Install]
+    WantedBy=multi-user.target
+
+- create a system user, enable the systemd service, and start it:
+
+  .. code:: shell
+
+    adduser --system --home /srv/smartcard-openpgp smartcard-openpgp
+    systemctl enable smartcard-gadget.service
+    systemctl start smartcard-gadget.service
+
+USB-device-capable Raspberry Pi with `Waveshare 2.13 inches e-Paper display V1`_
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+This extra hardware enables the use of a random PW1 PIN.
+
+The e-Paper display presents a grid of random values. One cell (A1 by default)
+contains the valid PIN.
+
+The cell containing the valid PIN can be changed by requesting a PW1 change, and
+providing a specially-formatted new password.
+For example: `C30000` references cell `C3`, `2b0000` references cell `B2`.
+Trailing zeroes are ignored.
+
+The grid changes periodically, as the card is used (at most once every
+30 seconds), and both the currently-displayed (at the time the "verify" command
+runs ont the card) and the previous PIN are accepted as a correct PIN.
+
+Key Derivation Function (KDF-DO) is not available in this mode.
+
+Similar to the `No extra hardware requirements`_ variant, but starting with:
+
+.. code:: shell
+
+  pip install smartcard-app-openpgp[ccid,randpin]
+
+The executable is then called `smartcard-openpgp-randpin-epaper` rather than
+`smartcard-openpgp-simple`.
+
+External requirements
+*********************
+
+Beyond the installation/build requirements, the code expected the Noto Mono
+font to be located at `/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf`:
+
+  .. code:: shell
+
+    apt-get install fonts-noto-mono
+
+Limitations
+***********
+
+The Raspberry Pi Zero has the USB Vbus pins bridged to the 5v power rail, which
+prevents the UDC from detecting bus disconnection. As a result, the display does
+not change when the Pi is disconnected from the host, and refreshes twice when
+reconnected. There is no workaround known so far.
+
+Notes for Debian
+****************
+
+Tested on the unofficial (but excellent) `raspi Debian port`_ .
+
+Sadly, the Debian kernel (as of this writing: 5.9-4) does not seem to support
+DeviceTree overlays, so there is some extra work needed:
+
+- fetch the kernel source for your current version (hint: apt-get source
+  linux-image-...), possibly on another machine
+- apply the following trivial patch to the DeviceTree compiler so it includes
+  symbols in the generated binary:
+
+  .. code:: diff
+
+    --- a/scripts/Makefile.lib 2020-12-20 00:46:45.488813401 +0000
+    +++ b/scripts/Makefile.lib 2020-12-20 00:47:21.808699913 +0000
+    @@ -318,6 +318,7 @@
+     quiet_cmd_dtc = DTC     $@
+     cmd_dtc = $(HOSTCC) -E $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ; \
+     	$(DTC) -O $(patsubst .%,%,$(suffix $@)) -o $@ -b 0 \
+    +		-@ \
+     		$(addprefix -i,$(dir $<) $(DTC_INCLUDE)) $(DTC_FLAGS) \
+     		-d $(depfile).dtc.tmp $(dtc-tmp) ; \
+     	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
+
+- build the correct DeviceTree binary file for your model (here, the zero-w).
+  This can be done on another machine, hence the `ARCH` variable:
+
+  .. code:: shell
+
+    ARCH=arm make bcm2835-rpi-zero-w.dtb
+
+- build the following overlay (using kernel-provided dtc command, you may also
+  install it from the `device-tree-compiler` package)::
+
+    // Enable spi0 interface (board pins 19, 21, 23, 24, 26)
+    /dts-v1/;
+    /plugin/;
+
+    / {
+    compatible = "brcm,bcm2835";
+    };
+
+    &gpio {
+        alt0 {
+            brcm,pins = <4 5>; // removed 7, 8, 9, 10, 11
+        };
+        spi0_cs_pins: spi0_cs_pins {
+            brcm,function = <1>; // out
+            brcm,pins = <7 8>;
+        };
+        spi0_pins: spi0_pins {
+            brcm,function = <4>; // alt0
+            brcm,pins = <9 10 11>;
+        };
+    };
+
+    &spi {
+        // CE0 is gpio 8, CE1 is gpio 7, both active low
+        cs-gpios = <&gpio 8 0x01>, <&gpio 7 0x01>;
+        status = "okay";
+        pinctrl-0 = <&spi0_cs_pins &spi0_pins>;
+        pinctrl-names = "default";
+        #address-cells = <1>;
+        #size-cells = <0>;
+        spidev@0 {
+            // "waveshare,epaper-display-v1": because that's what it really is.
+            // "rohm,dh2228fv": this is a dirty hack, this value triggers spidev
+            // to handle this device.
+            compatible = "waveshare,epaper-display-v1", "rohm,dh2228fv";
+            reg = <0>; // uses CS0
+            #address-cells = <1>;
+            #size-cells = <0>;
+            spi-max-frequency = <4000000>; // 4MHz: tcycle >= 250ns
+        };
+    };
+
+  .. code:: shell
+
+    ${KERNEL_SOURCE}/scripts/dtc/dtc -I dts -O dtb -@ -o vanilla-enable-spi0.dtbo vanilla-enable-spi0.dts
+
+- (optional) check that the overlay is consistent with kernel's dtb using
+  fdtoverlay from the `device-tree-compiler` package:
+
+  .. code:: shell
+
+    fdtoverlay -i ${KERNEL_SOURCE}/arch/arm/boot/dts/bcm2835-rpi-zero-w.dtb -o /dev/null vanilla-enable-spi0.dtbo
+
+  If this emits any error, then you pi may not boot with this overlay.
+
+- install the with-symbols devicetree and the spi overlay (as root):
+
+  .. code:: shell
+
+    cp ${KERNEL_SOURCE}/arch/arm/boot/dts/bcm2835-rpi-zero-w.dtb /boot/firmware/bcm2835-rpi-zero-w_with-symbols.dtb
+    mkdir -p /boot/firmware/overlays/
+    cp vanilla-enable-spi0.dtbo /boot/firmware/overlays/
+
+- tell the raspberry pi stage 2 bootloader about both files, by editing
+  ``/boot/firmware/config.txt``::
+
+    device_tree=bcm2835-rpi-zero-w_with-symbols.dtb
+    dtoverlay=vanilla-enable-spi0.dtbo
+
+For use as a module
++++++++++++++++++++
+
+Without optional dependencies (to use as a python module in your own projects,
+for example to assemble more complex gadgets).
+
+.. code:: shell
+
+  pip install smartcard-app-openpgp
+
+Usage
+-----
+
+Initial PIN values:
+
+- PW1 (aka user PIN): `123456`
+- PW3 (aka admin PIN): `12345678`
+- Reset Code: (not set)
+
+Initial key format:
+
+- sign, authenticate: ED25519
+- decrypt: X25519
+
 Threat model
 ------------
 
@@ -226,20 +440,7 @@ file selection     full DF, partial DF,   short file identifier
                    record identifier
 ================== ====================== =======
 
-Usage information
------------------
-
-For end-users:
-
-Initial PIN values:
-
-- PW1 (aka user PIN): `123456`
-- PW3 (aka admin PIN): `12345678`
-- Reset Code: (not set)
-
-Initial key format:
-
-- sign, authenticate: ED25519
-- decrypt: X25519
-
-For developers: see examples/* .
+.. _WaveShare 2.13 inches e-Paper display V1: https://www.waveshare.com/wiki/2.13inch_e-Paper_HAT
+.. _pyca/cryptography: https://github.com/pyca/cryptography
+.. _WaveShare 2.13 inches e-Paper display: https://www.waveshare.com/wiki/2.13inch_e-Paper_HAT
+.. _raspi Debian port: https://raspi.debian.net/

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Copyright (C) 2018-2020  Vincent Pelletier <plr.vincent@gmail.com>
 #
@@ -185,7 +184,13 @@ class ICCDFunctionWithZODB(ICCDFunction):
         logger.info('All ready, serving until keyboard interrupt')
         super().processEventsForever()
 
-def main():
+def gnuk():
+    """
+    Command to run gnuk tests with.
+
+    Gnuk test suite assumes rsa2048 default key format, but I would very much
+    like to keep the default on Curve25519.
+    """
     parser = GadgetSubprocessManager.getArgumentParser(
         description='ONLY for running gnuk tests.',
     )
@@ -226,6 +231,3 @@ def main():
         ) as gadget
     ):
         gadget.waitForever()
-
-if __name__ == '__main__':
-    main()

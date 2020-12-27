@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Copyright (C) 2018-2020  Vincent Pelletier <plr.vincent@gmail.com>
 #
@@ -389,6 +388,3 @@ def main():
         ) as gadget
     ):
         gadget.waitForever()
-
-if __name__ == '__main__':
-    main()

@@ -38,6 +38,17 @@ setup(
         'smartcard',
         'cryptography>=3.1',
     ],
+    extras_require={
+        'ccid': ['usb-f-ccid'],
+        'randpin': ['freetype-py'],
+    },
+    entry_points={
+        'console_scripts': [
+            'smartcard-openpgp-testtarget-gnuk = smartcard.app.openpgp.cli.test:gnuk [ccid]',
+            'smartcard-openpgp-simple = smartcard.app.openpgp.cli.simple:main [ccid]',
+            'smartcard-openpgp-randpin-epaper = smartcard.app.openpgp.cli.randpin.epaper:main [ccid,randpin]',
+        ],
+    },
     classifiers=[
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
         'Operating System :: OS Independent',
