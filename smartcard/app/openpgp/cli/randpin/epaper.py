@@ -60,16 +60,17 @@ DISPLAY_ROW_NAME = ('A', 'B', 'C', 'D')
 DISPLAY_COLUMN_NAME = ('1', '2', '3')
 
 class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
-    _column_width = 80
+    _column_width = 75
     _line_height = 21
     _line_height_with_margin = _line_height + 3
     _column_name_height = 18
     _column_name_x_offset = 28
-    _row_name_width = 12
+    _row_name_width = 16
+    _column_x_offset = 25
     _column_name_to_x = {
-        '1': 0 * _column_width + 15,
-        '2': 1 * _column_width + 15,
-        '3': 2 * _column_width + 15,
+        '1': 0 * _column_width + _column_x_offset,
+        '2': 1 * _column_width + _column_x_offset,
+        '3': 2 * _column_width + _column_x_offset,
     }
     _row_name_to_y = {
         'A': 1 * _line_height_with_margin,
@@ -131,18 +132,18 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
     def displayReadyUnplugged(self):
         self.__framebuffer.blank(color=Framebuffer.COLOR_OFF)
         self.printAt(
-            x=0,
-            y=0, # TODO: position
-            text="Ready, unplugged", # TODO: better caption
+            x=35,
+            y=45,
+            text="Ready, unplugged",
         )
-        # force_clean to wipe any PIN ghosting.
-        self.updateDisplay(force_clean=True, wait=False)
+        self.updateDisplay(wait=False)
 
     def __generatePinTable(self, tries_left, force=False):
         if not self._can_generate and not force:
             return
         fb = self.__framebuffer
         fb.blank(color=fb.COLOR_ON)
+        # Column headers background
         fb.rect(
             0, 0,
             self._row_name_width, fb.height - 1,
@@ -155,6 +156,56 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             color=fb.COLOR_OFF,
             fill=True,
         )
+        # Rounded corners
+        fb.rect(
+            self._row_name_width + 1, self._column_name_height + 1,
+            self._row_name_width + 1 + 8, self._column_name_height + 1 + 8,
+            color=fb.COLOR_OFF,
+            fill=True,
+        )
+        fb.circle(
+            self._row_name_width + 1 + 8, self._column_name_height + 1 + 8,
+            8,
+            color=fb.COLOR_ON,
+            fill=True,
+        )
+        fb.rect(
+            fb.width - 1 - 8, self._column_name_height + 1,
+            fb.width - 1, self._column_name_height + 1 + 8,
+            color=fb.COLOR_OFF,
+            fill=True,
+        )
+        fb.circle(
+            fb.width - 1 - 8, self._column_name_height + 1 + 8,
+            8,
+            color=fb.COLOR_ON,
+            fill=True,
+        )
+        fb.rect(
+            self._row_name_width + 1, fb.height - 1 - 8,
+            self._row_name_width + 1 + 8, fb.height - 1,
+            color=fb.COLOR_OFF,
+            fill=True,
+        )
+        fb.circle(
+            self._row_name_width + 1 + 8, fb.height - 1 - 8,
+            8,
+            color=fb.COLOR_ON,
+            fill=True,
+        )
+        fb.rect(
+            fb.width - 1 - 8, fb.height - 1 - 8,
+            fb.width - 1, fb.height - 1,
+            color=fb.COLOR_OFF,
+            fill=True,
+        )
+        fb.circle(
+            fb.width - 1 - 8, fb.height - 1 - 8,
+            8,
+            color=fb.COLOR_ON,
+            fill=True,
+        )
+        # Column headers captions
         for caption, x in self._column_name_to_x.items():
             self.printAt(
                 x + self._column_name_x_offset, 0,
@@ -164,12 +215,69 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             )
         for caption, y in self._row_name_to_y.items():
             self.printAt(
-                0, y,
+                3, y,
                 caption,
                 width=15,
                 color=Framebuffer.COLOR_ON,
             )
-        # TODO: display tries left in top-left corner.
+        # 3-tries background
+        fb.circle(
+            8, 8, 8,
+            color=Framebuffer.COLOR_ON,
+            fill=True,
+        )
+        fb.circle(
+            34, 8, 8,
+            color=Framebuffer.COLOR_ON,
+            fill=True,
+        )
+        fb.rect(
+            8, 0,
+            34, 16,
+            color=Framebuffer.COLOR_ON,
+            fill=True,
+        )
+        for index, center_x in ((0, 8), (1, 21), (2, 34)):
+            if tries_left <= index:
+                # Try failed: cross
+                fb.line(
+                    center_x - 4, 4,
+                    center_x + 4, 12,
+                    color=Framebuffer.COLOR_OFF,
+                )
+                fb.line(
+                    center_x - 3, 4,
+                    center_x + 4, 11,
+                    color=Framebuffer.COLOR_OFF,
+                )
+                fb.line(
+                    center_x - 4, 5,
+                    center_x + 3, 12,
+                    color=Framebuffer.COLOR_OFF,
+                )
+                fb.line(
+                    center_x + 4, 4,
+                    center_x - 4, 12,
+                    color=Framebuffer.COLOR_OFF,
+                )
+                fb.line(
+                    center_x + 3, 4,
+                    center_x - 4, 11,
+                    color=Framebuffer.COLOR_OFF,
+                )
+                fb.line(
+                    center_x + 4, 5,
+                    center_x - 3, 12,
+                    color=Framebuffer.COLOR_OFF,
+                )
+            else:
+                # Try still available: circle
+                fb.circle(
+                    center_x, 8, 5,
+                    color=Framebuffer.COLOR_OFF,
+                    fill=False,
+                )
+        # Generate random PINs and display them
         pin_dict = {}
         for row_name, column_name in itertools.product(
             DISPLAY_ROW_NAME,
@@ -272,11 +380,11 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             self.__db = None
         self.__framebuffer.blank(color=Framebuffer.COLOR_OFF)
         self.printAt(
-            x=0,
-            y=0, # TODO: position
-            text="Exited", # TODO: better caption
+            x=85,
+            y=45,
+            text="Exited",
         )
-        self.updateDisplay(force_clean=True)
+        self.updateDisplay()
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.__unenter()
