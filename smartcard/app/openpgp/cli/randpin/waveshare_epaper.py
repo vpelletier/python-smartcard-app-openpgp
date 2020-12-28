@@ -23,7 +23,7 @@ pins hard-coded).
 https://www.waveshare.com/wiki/2.13inch_e-Paper_HAT
 """
 import time
-from gpio import (
+from .gpio import (
     GPIOHANDLE_REQUEST_ACTIVE_LOW,
     GPIOHANDLE_REQUEST_OUTPUT,
     GPIOHANDLE_REQUEST_INPUT,

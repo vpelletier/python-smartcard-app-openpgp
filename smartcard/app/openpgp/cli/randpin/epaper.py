@@ -42,8 +42,8 @@ from smartcard.app.openpgp import (
     PINQueueConnection,
 )
 from smartcard.utils import transaction_manager
-from framebuffer import Framebuffer
-from waveshare_epaper import WaveShareEPaper
+from .framebuffer import Framebuffer
+from .waveshare_epaper import WaveShareEPaper
 
 logger = logging.getLogger(__name__)
 
