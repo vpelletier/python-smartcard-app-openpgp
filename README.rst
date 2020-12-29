@@ -108,7 +108,8 @@ Left and top borders, white text on black background: row and column titles.
 Main area: PIN grid. If this card uses the default pin cell, PW1 is ``291413``.
 
 This grid is completely regenerated when card commands are issued (even if no
-PIN input is required), at most once every 30 seconds.
+PIN input is required), at most once every 30 seconds or after each ``verify``
+command, whichever comes first.
 
 External requirements
 *********************
