@@ -64,8 +64,11 @@ fom a virtualenv at `/opt/smartcard-openpgp`):
     systemctl enable smartcard-gadget.service
     systemctl start smartcard-gadget.service
 
-USB-device-capable Raspberry Pi with `Waveshare 2.13 inches e-Paper display V1`_
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+USB-device-capable Raspberry Pi with IL3895/SSD1780-based ePaper displays
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Expected screen resolution: 250x122, such as the `WaveShare 2.13 inches e-Paper
+display V1`_, or the black-and-white `Pimoroni Inky pHAT`_.
 
 This extra hardware enables the use of a random PW1 PIN.
 
@@ -442,6 +445,6 @@ file selection     full DF, partial DF,   short file identifier
 ================== ====================== =======
 
 .. _WaveShare 2.13 inches e-Paper display V1: https://www.waveshare.com/wiki/2.13inch_e-Paper_HAT
+.. _Pimoroni Inky pHAT: https://shop.pimoroni.com/products/inky-phat?variant=12549254938707
 .. _pyca/cryptography: https://github.com/pyca/cryptography
-.. _WaveShare 2.13 inches e-Paper display: https://www.waveshare.com/wiki/2.13inch_e-Paper_HAT
 .. _raspi Debian port: https://raspi.debian.net/

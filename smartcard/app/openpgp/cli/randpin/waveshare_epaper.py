@@ -33,6 +33,7 @@ from .gpio import (
 class WaveShareEPaper:
     """
     Driver for WaveShare e-Paper v1
+    Which is based on the IL3895/SSD1780 driver chip.
     XXX: Assumes RaspberryPi GPIOs pinout, requires spi0 enabled
     """
     _reset_file = None
@@ -56,7 +57,6 @@ class WaveShareEPaper:
     _window_xmin = None
     _window_xmax = None
     _DRIVER_OUTPUT_CONTROL = b'\x01'
-    _BOOSTER_SOFT_START_CONTROL = b'\x0c'
     _SLEEP = b'\x10'
     _SLEEP_WAKE = b'\x00' # Reset seems require to wake from sleep
     _SLEEP_SLEEP = b'\x01'
@@ -70,18 +70,54 @@ class WaveShareEPaper:
         volts / -0.02 + 5
     ).to_bytes(1, 'little')
     _WRITE_LUT_REGISTER = b'\x32'
+    # LUT format:
+    # - entries 0x00..0x09: waveform levels for each bit transition combination
+    #   Packing order: 0bll_lh_hl_hh
+    #   Values for each level:
+    #   - 00 = VSS (== eliminate charges)
+    #   - 01 = VSH (== drive high)
+    #   - 10 = VSL (== drive low)
+    # - entries 0x0a..0x0f: constant 0x00
+    # - entries 0x10..0x19: waveform level hold durations and repetitions
+    #   Packing order: 0bRRRR_ddddd 0brrr_ddddd
+    #   Repeats: 0bRRRrrr + 1 times
+    #   Duration: ddddd clock cycles (0 = phase skipped)
+    # - entries 0x1a..0x1c: constant 0x00
+    # - value set by command 0x3a (DUMMY_LINE_PERIOD, default: 0x06)
+    # - value set by command 0x04 (source driving voltage control, default: 0x19)
+    # - value set by command 0x3b (gate line width, default: 0x0b)
     _LUT_FULL_UPDATE = (
         b'\x22\x55\xAA\x55\xAA\x55\xAA\x11'
         b'\x00\x00\x00\x00\x00\x00\x00\x00'
         b'\x1E\x1E\x1E\x1E\x1E\x1E\x1E\x1E'
         b'\x01\x00\x00\x00\x00\x00'
     )
-    _LUT_PARTIAL_UPDATE  = (
+    _LUT_PARTIAL_UPDATE = (
         b'\x18\x00\x00\x00\x00\x00\x00\x00'
         b'\x00\x00\x00\x00\x00\x00\x00\x00'
         b'\x0F\x01\x00\x00\x00\x00\x00\x00'
         b'\x00\x00\x00\x00\x00\x00'
     )
+    _LUT_CUSTOM = bytes((
+        0b01_10_01_10,
+        0b10_01_10_01,
+        0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # constant
+
+        0b000_00111,
+        0b000_01111,
+        0b000_00001,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+        0x00, 0x00, 0x00, # constant
+
+        0x06,
+        0x19,
+        0x0b,
+    ))
+    assert len(_LUT_CUSTOM) == 32, len(_LUT_CUSTOM)
     _SET_DUMMY_LINE_PERIOD = b'\x3a'
     _SET_GATE_TIME = b'\x3b'
     _BORDER_WAVEFORM_CONTROL = b'\x3c'
@@ -105,14 +141,10 @@ class WaveShareEPaper:
     _DISPLAY_UPDATE_CONTROL_2_STAGE_PATTERN_DISPLAY = 0x04 # XXX: guess
     _DISPLAY_UPDATE_CONTROL_2_STAGE_DISABLE_ANALOG  = 0x02 # XXX: guess
     _DISPLAY_UPDATE_CONTROL_2_STAGE_DISABLE_CLOCK   = 0x01 # XXX: guess
-    _TERMINATE_FRAME_READ_WRITE = b'\xff'
     _SET_RAM_X_WINDOW = b'\x44'
     _SET_RAM_Y_WINDOW = b'\x45'
     _SET_RAM_X_COUNTER = b'\x4e'
     _SET_RAM_Y_COUNTER = b'\x4f'
-
-    def __init__(self, update_threshold=5):
-        self._update_threshold = update_threshold
 
     @property
     def width(self):
@@ -147,29 +179,12 @@ class WaveShareEPaper:
             y_max = self._height - 1
             self._command(
                 self._DRIVER_OUTPUT_CONTROL,
-                y_max.to_bytes(2, 'little') +
-                b'\x00', # byte not in spec, example: "GD = 0 SM = 0 TB = 0"
-            )
-            self._command(
-                self._BOOSTER_SOFT_START_CONTROL, # XXX: not in spec at all
-                b'\xd7\xd6\x9d',
-            )
-            self._command(
-                self._WRITE_VCOM_REGISTER,
-                self._WRITE_VCOM_VOLTS_TO_VALUE(-3.26), # XXX: spec table stops at -3V
-            )
-            self._command(
-                self._SET_DUMMY_LINE_PERIOD,
-                b'\x1a', # Value not in spec (says 0x06), example: "4 dummy lines per gate"
-            )
-            self._command(
-                self._SET_GATE_TIME,
-                b'\x08', # Value not in spec (says 0x0b), example: "2us per line"
+                # 250 gates, scanned in order 0, 1, 2, ... 249
+                y_max.to_bytes(1, 'little') + b'\x00',
             )
             self._command(
                 self._BORDER_WAVEFORM_CONTROL,
                 self._BORDER_WAVEFORM_CONTROL_FIX_LEVEL_VSH,
-                #self._BORDER_WAVEFORM_CONTROL_VAR_LEVEL_GSC1_GSD1, # XXX: value not in spec
             )
             self._command(
                 self._DATA_ENTRY_MODE_SETTING,
@@ -178,7 +193,7 @@ class WaveShareEPaper:
                 ).to_bytes(1, 'little'),
             )
             self.setWindow(0, 0, self._width - 1, y_max)
-            self._update_count = self._update_threshold
+            self._command(self._WRITE_LUT_REGISTER, self._LUT_CUSTOM)
         except:
             self.__unenter()
             raise
@@ -216,14 +231,7 @@ class WaveShareEPaper:
         else:
             raise ValueError('Display is stuck')
 
-    def swap(self, force_clean=False, wait=True):
-        if force_clean or self._update_count >= self._update_threshold:
-            self._command(self._WRITE_LUT_REGISTER, self._LUT_FULL_UPDATE)
-            self._update_count = 0
-        else:
-            if self._update_count == 0:
-                self._command(self._WRITE_LUT_REGISTER, self._LUT_PARTIAL_UPDATE)
-            self._update_count += 1
+    def swap(self, wait=True):
         self._command(
             self._DISPLAY_UPDATE_CONTROL_2,
             (
@@ -236,7 +244,6 @@ class WaveShareEPaper:
             ).to_bytes(1, 'little'), # XXX: value 0xd4 not in spec
         )
         self._command(self._MASTER_ACTIVATION)
-        self._command(self._TERMINATE_FRAME_READ_WRITE) # XXX: not in spec
         if wait:
             self.wait()
 
@@ -267,4 +274,4 @@ class WaveShareEPaper:
         self.setCursor(0, self._window_ymax)
         for _ in range(self._window_ymax):
             self._command(self._WRITE_RAM, line_data)
-        self.swap(force_clean=True)
+        self.swap()

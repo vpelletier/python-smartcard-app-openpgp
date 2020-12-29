@@ -102,14 +102,14 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
         # generated table. Cell ids are a row name followed by a column name.
         self.__pin_queue = deque([], 2)
 
-    def updateDisplay(self, force_clean=False, wait=True):
+    def updateDisplay(self, wait=True):
         display = self.__display
         display.blit(
             image=self.__framebuffer.pixelbuffer,
             x=0,
             y=0,
         )
-        display.swap(force_clean=force_clean, wait=wait)
+        display.swap(wait=wait)
 
     def printAt(
         self,
