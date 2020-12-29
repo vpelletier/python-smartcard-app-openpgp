@@ -51,6 +51,7 @@ fom a virtualenv at `/opt/smartcard-openpgp`):
       --user smartcard-openpgp \
       --filestorage /srv/smartcard-openpgp/card.fs \
       --serial "%m"
+    KillMode=mixed
 
     [Install]
     WantedBy=usb-gadget.target
