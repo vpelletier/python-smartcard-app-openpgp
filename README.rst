@@ -49,7 +49,8 @@ fom a virtualenv at `/opt/smartcard-openpgp`):
     [Service]
     ExecStart=/opt/smartcard-openpgp/bin/smartcard-openpgp-simple \
       --user smartcard-openpgp \
-      --filestorage /srv/smartcard-openpgp/card.fs
+      --filestorage /srv/smartcard-openpgp/card.fs \
+      --serial "%m"
 
     [Install]
     WantedBy=usb-gadget.target
