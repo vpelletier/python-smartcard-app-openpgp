@@ -36,8 +36,8 @@ To get a standard card, with an executable setting up a gadget.
 
   pip install smartcard-app-openpgp[ccid]
 
-Then, you may set it up to automatically start on boot (assuming `pip` comes
-fom a virtualenv at `/opt/smartcard-openpgp`):
+Then, you may set it up to automatically start on boot (assuming ``pip`` comes
+fom a virtualenv at ``/opt/smartcard-openpgp``):
 
 - create a systemd service:
 
@@ -77,8 +77,8 @@ contains the valid PIN.
 
 The cell containing the valid PIN can be changed by requesting a PW1 change, and
 providing a specially-formatted new password.
-For example: `C30000` references cell `C3`, `2b0000` references cell `B2`.
-Trailing zeroes are ignored.
+For example: ``C30000`` references cell ``C3``, ``2b0000`` references cell
+``B2``. Trailing zeroes are ignored.
 
 The grid changes periodically, as the card is used (at most once every
 30 seconds), and both the currently-displayed (at the time the "verify" command
@@ -92,14 +92,14 @@ Similar to the `No extra hardware requirements`_ variant, but starting with:
 
   pip install smartcard-app-openpgp[ccid,randpin]
 
-The executable is then called `smartcard-openpgp-randpin-epaper` rather than
-`smartcard-openpgp-simple`.
+The executable is then called ``smartcard-openpgp-randpin-epaper`` rather than
+``smartcard-openpgp-simple``.
 
 External requirements
 *********************
 
 Beyond the installation/build requirements, the code expected the Noto Mono
-font to be located at `/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf`:
+font to be located at ``/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf``:
 
   .. code:: shell
 
@@ -140,14 +140,14 @@ DeviceTree overlays, so there is some extra work needed:
      	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
 
 - build the correct DeviceTree binary file for your model (here, the zero-w).
-  This can be done on another machine, hence the `ARCH` variable:
+  This can be done on another machine, hence the ``ARCH`` variable:
 
   .. code:: shell
 
     ARCH=arm make bcm2835-rpi-zero-w.dtb
 
 - build the following overlay (using kernel-provided dtc command, you may also
-  install it from the `device-tree-compiler` package)::
+  install it from the ``device-tree-compiler`` package)::
 
     // Enable spi0 interface (board pins 19, 21, 23, 24, 26)
     /dts-v1/;
@@ -196,7 +196,7 @@ DeviceTree overlays, so there is some extra work needed:
     ${KERNEL_SOURCE}/scripts/dtc/dtc -I dts -O dtb -@ -o vanilla-enable-spi0.dtbo vanilla-enable-spi0.dts
 
 - (optional) check that the overlay is consistent with kernel's dtb using
-  fdtoverlay from the `device-tree-compiler` package:
+  fdtoverlay from the ``device-tree-compiler`` package:
 
   .. code:: shell
 
@@ -233,8 +233,8 @@ Usage
 
 Initial PIN values:
 
-- PW1 (aka user PIN): `123456`
-- PW3 (aka admin PIN): `12345678`
+- PW1 (aka user PIN): ``123456``
+- PW3 (aka admin PIN): ``12345678``
 - Reset Code: (not set)
 
 Initial key format:
