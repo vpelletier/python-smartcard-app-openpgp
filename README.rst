@@ -61,6 +61,7 @@ fom a virtualenv at ``/opt/smartcard-openpgp``):
   .. code:: shell
 
     adduser --system --home /srv/smartcard-openpgp smartcard-openpgp
+    chmod go= /srv/smartcard-openpgp
     systemctl enable smartcard-gadget.service
     systemctl start smartcard-gadget.service
 
