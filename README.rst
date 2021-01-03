@@ -421,8 +421,8 @@ high level features
 passcodes          PW1, PW3, RC
 passcode format    UTF-8, KDF             PIN block format 2
 cryptography       RSA: 2048, 3072, 4096  3DES, Elgamal, RSA <=1024, cast5,
-                                          idea, blowfish, twofish, camellia
-                   ECDH: SECP256R1,
+                                          idea, blowfish, twofish, camellia,
+                   ECDH: SECP256R1,       EDDSA ED25516
                    SECP384R1,
                    SECP512R1,
                    BRAINPOOL256R1,
@@ -436,8 +436,6 @@ cryptography       RSA: 2048, 3072, 4096  3DES, Elgamal, RSA <=1024, cast5,
                    BRAINPOOL256R1,
                    BRAINPOOL384R1,
                    BRAINPOOL512R1
-
-                   EDDSA: ED25519
 operations         key generation, key    encryption (AES), get challenge,
                    import, signature,     attestation
                    decryption,

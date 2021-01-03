@@ -218,10 +218,11 @@ ROLE_TO_SUPPORTED_ALGORITHM_INFORMATION_LIST_DICT = {
 
 DEFAULT_ALGORITHM_ATTRIBUTES_SIGNATURE = AlgorithmAttributesSignature.encode(
     value={
-        'algorithm': AlgorithmAttributesSignature.EDDSA,
+        'algorithm': AlgorithmAttributesSignature.RSA,
         'parameter_dict': {
-            'algo': OID_ED25519,
-            'with_public_key': False,
+            'public_exponent_bit_length': 32,
+            'modulus_bit_length': 2048,
+            'import_format': AlgorithmAttributesSignature.RSA.IMPORT_FORMAT_STANDARD,
         },
     },
     codec=CodecBER,
@@ -238,18 +239,19 @@ DEFAULT_ALGORITHM_ATTRIBUTES_DECRYPTION = AlgorithmAttributesDecryption.encode(
 )
 DEFAULT_ALGORITHM_ATTRIBUTES_AUTHENTICATION = AlgorithmAttributesAuthentication.encode(
     value={
-        'algorithm': AlgorithmAttributesAuthentication.EDDSA,
+        'algorithm': AlgorithmAttributesAuthentication.RSA,
         'parameter_dict': {
-            'algo': OID_ED25519,
-            'with_public_key': False,
+            'public_exponent_bit_length': 32,
+            'modulus_bit_length': 2048,
+            'import_format': AlgorithmAttributesAuthentication.RSA.IMPORT_FORMAT_STANDARD,
         },
     },
     codec=CodecBER,
 )
 
-assert DEFAULT_ALGORITHM_ATTRIBUTES_SIGNATURE == b'\x16\x2b\x06\x01\x04\x01\xda\x47\x0f\x01', DEFAULT_ALGORITHM_ATTRIBUTES_SIGNATURE.hex()
+assert DEFAULT_ALGORITHM_ATTRIBUTES_SIGNATURE == b'\x01\x08\x00\x00\x20\x00', DEFAULT_ALGORITHM_ATTRIBUTES_SIGNATURE.hex()
 assert DEFAULT_ALGORITHM_ATTRIBUTES_DECRYPTION == b'\x12\x2b\x06\x01\x04\x01\x97\x55\x01\x05\x01', DEFAULT_ALGORITHM_ATTRIBUTES_DECRYPTION.hex()
-assert DEFAULT_ALGORITHM_ATTRIBUTES_AUTHENTICATION == b'\x16\x2b\x06\x01\x04\x01\xda\x47\x0f\x01', DEFAULT_ALGORITHM_ATTRIBUTES_AUTHENTICATION.hex()
+assert DEFAULT_ALGORITHM_ATTRIBUTES_AUTHENTICATION == b'\x01\x08\x00\x00\x20\x00', DEFAULT_ALGORITHM_ATTRIBUTES_AUTHENTICATION.hex()
 assert DEFAULT_ALGORITHM_ATTRIBUTES_SIGNATURE in ROLE_TO_SUPPORTED_ALGORITHM_INFORMATION_LIST_DICT[KEY_ROLE_SIGN]
 assert DEFAULT_ALGORITHM_ATTRIBUTES_DECRYPTION in ROLE_TO_SUPPORTED_ALGORITHM_INFORMATION_LIST_DICT[KEY_ROLE_DECRYPT]
 assert DEFAULT_ALGORITHM_ATTRIBUTES_AUTHENTICATION in ROLE_TO_SUPPORTED_ALGORITHM_INFORMATION_LIST_DICT[KEY_ROLE_AUTHENTICATE]
@@ -1298,6 +1300,11 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                 ),
             )
         elif isinstance(private_key, Ed25519PrivateKey):
+            # EDDSA support requires prehash (Ed25519ph) support, which is
+            # missing in pyca.cryptography, and in turn is missing in openssl.
+            # So even if below code "works", it does not produce usable
+            # output.
+            raise NotImplementedError
             signature = private_key.sign(
                 data=bytes(condensate),
             )
