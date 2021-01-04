@@ -45,7 +45,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
 )
 from cryptography.hazmat.primitives.asymmetric.ec import (
     EllipticCurvePrivateKey,
-    EllipticCurvePublicNumbers,
+    EllipticCurvePublicKey,
     ECDSA,
     ECDH,
 )
@@ -1365,11 +1365,11 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         elif isinstance(private_key, EllipticCurvePrivateKey):
             plaintext = private_key.exchange(
                 algorithm=ECDH(),
-                peer_public_key=EllipticCurvePublicNumbers.from_encoded_point(
+                peer_public_key=EllipticCurvePublicKey.from_encoded_point(
                     curve=self.getPrivateKeyTypeProperties(
                         channel=channel,
                         role=KEY_ROLE_DECRYPT,
-                    )['parameter_dict']['algo'],
+                    )['parameter_dict']['algo'](),
                     data=self._getECPeerPublicKey(ciphertext=bytes(ciphertext)),
                 ),
             )

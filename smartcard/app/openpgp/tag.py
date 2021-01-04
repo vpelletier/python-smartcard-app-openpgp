@@ -36,8 +36,8 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     BrainpoolP256R1,
     BrainpoolP384R1,
     BrainpoolP512R1,
+    EllipticCurve,
     EllipticCurveOID,
-    EllipticCurvePrivateKey,
 )
 from smartcard.asn1 import (
     CLASS_APPLICATION,
@@ -706,10 +706,10 @@ class AlgorithmAttributesBase(_PrivateSimpleBase):
             data = component_dict[
                 CardholderPrivateKeyTemplate.CurvePrivateKey
             ]
-            if issubclass(curve, EllipticCurvePrivateKey):
+            if issubclass(curve, EllipticCurve):
                 result = derive_private_key(
-                    private_value=data,
-                    curve=curve,
+                    private_value=int.from_bytes(data, 'big'),
+                    curve=curve(),
                 )
             elif issubclass(
                 curve,
@@ -720,14 +720,14 @@ class AlgorithmAttributesBase(_PrivateSimpleBase):
             ):
                 result = curve.from_private_bytes(data=data)
             else:
-                raise TypeError(type(curve))
+                raise TypeError(repr(curve))
             return result
 
         def newKey(self):
             curve = self._format_dict['algo']
-            if issubclass(curve, EllipticCurvePrivateKey):
+            if issubclass(curve, EllipticCurve):
                 result = generate_private_ec_key(
-                    curve=curve,
+                    curve=curve(),
                 )
             elif issubclass(
                 curve,
@@ -738,7 +738,7 @@ class AlgorithmAttributesBase(_PrivateSimpleBase):
             ):
                 result = curve.generate()
             else:
-                raise TypeError(type(curve))
+                raise TypeError(repr(curve))
             return result
 
     class ECDH(ECBase):
