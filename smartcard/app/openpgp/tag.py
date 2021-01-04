@@ -506,7 +506,7 @@ class ExtendedCapabilities(_PrivateSimpleBase):
 
 OID_SECP256R1      = ObjectIdentifier.encode(EllipticCurveOID.SECP256R1.dotted_string      , codec=None)
 OID_SECP384R1      = ObjectIdentifier.encode(EllipticCurveOID.SECP384R1.dotted_string      , codec=None)
-OID_SECP512R1      = ObjectIdentifier.encode(EllipticCurveOID.SECP521R1.dotted_string      , codec=None)
+OID_SECP521R1      = ObjectIdentifier.encode(EllipticCurveOID.SECP521R1.dotted_string      , codec=None)
 OID_BRAINPOOL256R1 = ObjectIdentifier.encode(EllipticCurveOID.BRAINPOOLP256R1.dotted_string, codec=None)
 OID_BRAINPOOL384R1 = ObjectIdentifier.encode(EllipticCurveOID.BRAINPOOLP384R1.dotted_string, codec=None)
 OID_BRAINPOOL512R1 = ObjectIdentifier.encode(EllipticCurveOID.BRAINPOOLP512R1.dotted_string, codec=None)
@@ -746,7 +746,7 @@ class AlgorithmAttributesBase(_PrivateSimpleBase):
         _OID_TO_CURVE_DICT = {
             OID_SECP256R1     : SECP256R1, # ansix9p256r1
             OID_SECP384R1     : SECP384R1, # ansix9p384r1
-            OID_SECP512R1     : SECP521R1, # ansix9p521r1
+            OID_SECP521R1     : SECP521R1, # ansix9p521r1
             OID_BRAINPOOL256R1: BrainpoolP256R1, # brainpoolP256r1
             OID_BRAINPOOL384R1: BrainpoolP384R1, # brainpoolP384r1
             OID_BRAINPOOL512R1: BrainpoolP512R1, # brainpoolP512r1
@@ -758,7 +758,7 @@ class AlgorithmAttributesBase(_PrivateSimpleBase):
         _OID_TO_CURVE_DICT = {
             OID_SECP256R1     : SECP256R1, # ansix9p256r1
             OID_SECP384R1     : SECP384R1, # ansix9p384r1
-            OID_SECP512R1     : SECP521R1, # ansix9p521r1
+            OID_SECP521R1     : SECP521R1, # ansix9p521r1
             OID_BRAINPOOL256R1: BrainpoolP256R1, # brainpoolP256r1
             OID_BRAINPOOL384R1: BrainpoolP384R1, # brainpoolP384r1
             OID_BRAINPOOL512R1: BrainpoolP512R1, # brainpoolP512r1
