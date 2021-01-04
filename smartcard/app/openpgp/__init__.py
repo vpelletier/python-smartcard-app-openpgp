@@ -140,14 +140,7 @@ from .tag import (
     SignatureCounter,
     SignatureKeyFingerprint,
     SignatureKeyTimestamp,
-    OID_SECP256R1,
-    OID_SECP384R1,
-    OID_SECP512R1,
-    OID_BRAINPOOL256R1,
-    OID_BRAINPOOL384R1,
-    OID_BRAINPOOL512R1,
     OID_X25519,
-    OID_ED25519,
 )
 
 logger = logging.getLogger(__name__)
