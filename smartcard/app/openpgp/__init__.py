@@ -36,6 +36,7 @@ from cryptography.hazmat.primitives.asymmetric.padding import (
 )
 from cryptography.hazmat.primitives.asymmetric.utils import (
     Prehashed,
+    decode_dss_signature,
 )
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -1286,11 +1287,16 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                 algorithm=Prehashed(algorithm=HASH_OID_DICT[oid]()),
             )
         elif isinstance(private_key, EllipticCurvePrivateKey):
-            signature = private_key.sign(
+            r, s = decode_dss_signature(private_key.sign(
                 data=bytes(condensate),
                 signature_algorithm=ECDSA(Prehashed(
                     algorithm=HASH_LENGTH_TO_HASH_DICT[len(condensate)]()),
                 ),
+            ))
+            field_axis_size = (private_key.curve.key_size + 7) // 8
+            signature = (
+                r.to_bytes(field_axis_size, 'big') +
+                s.to_bytes(field_axis_size, 'big')
             )
         elif isinstance(private_key, Ed25519PrivateKey):
             # EDDSA support requires prehash (Ed25519ph) support, which is
