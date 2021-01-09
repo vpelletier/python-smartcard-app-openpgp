@@ -1309,7 +1309,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             )
         else:
             raise RecordNotFound
-        return signature + SUCCESS
+        return signature
 
 # TODO: implement and advertise AES support
 #    def _encrypt(self, channel, cleartext):
@@ -1380,7 +1380,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             )
         else:
             raise RecordNotFound
-        return plaintext + SUCCESS
+        return plaintext
 
     def performSecurityOperation(
         self,
@@ -1413,7 +1413,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             result = self._decrypt(channel=channel, ciphertext=command_data)
         else:
             raise WrongParametersP1P2
-        return result
+        return result + SUCCESS
 
     def setSecurityEnvironment(
         self,
