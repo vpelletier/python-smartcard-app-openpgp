@@ -79,6 +79,7 @@ from smartcard.tag import (
     CardCapabilities,
     CardholderData,
     CardServiceData,
+    DiscretionaryTemplate,
     encodeSecurityConditionByte,
     ExtendedHeaderList,
     FileIdentifier,
@@ -542,7 +543,6 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             HistoricalData,
             ExtendedLengthInformation,
             #TAG_GENERAL_FEATURE_MANAGEMENT, # n/a
-            #TAG_DISCRETIONARY_TEMPLATE, # ???
             ExtendedCapabilities,
             AlgorithmAttributesSignature,
             AlgorithmAttributesDecryption,
@@ -559,7 +559,12 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
             value = self.getData(tag=tag, decode=False)
             if value is not None:
                 result.append(CodecBER.wrapValue(tag, value))
-        return (b''.join(result), )
+        return (
+            CodecBER.wrapValue(
+                tag=DiscretionaryTemplate,
+                encoded=b''.join(result),
+            ),
+        )
 
     def _getCardholderData(self):
         result = []
@@ -970,7 +975,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                 ApplicationLabel:                  DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
                 SecuritySupportTemplate:           DATA_OBJECT_GET_ALWAYS_PUT_NEVER,
                 ExtendedHeaderList:                DATA_OBJECT_GET_NEVER_PUT_PW3, # Key import
-                #TAG_DISCRETIONARY_DATA_OBJECT:
+                #DiscretionaryTemplate: ???
                 #TAG_CARD_HOLDER_PRIVATE_KEY_TEMPLATE: ??? (only used for encapsulation type and not as DO ?)
                 Private1: ((FileSecurityCompactFormat, {
                     FileSecurityCompactFormat.GET: SECURITY_CONDITION_ALLOW,
