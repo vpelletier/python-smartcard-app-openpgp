@@ -54,6 +54,7 @@ import persistent
 import ZODB.Connection
 from smartcard.asn1 import (
     CodecCompact,
+    CodecBER,
 )
 from smartcard import (
     ApplicationFile,
@@ -90,9 +91,6 @@ from smartcard.tag import (
     SECURITY_CONDITION_ALLOW,
     URL,
     WRITE_FUNCTION_ONE_TIME,
-)
-from smartcard.asn1 import (
-    CodecBER,
 )
 from smartcard.utils import (
     PersistentWithVolatileSurvivor,
