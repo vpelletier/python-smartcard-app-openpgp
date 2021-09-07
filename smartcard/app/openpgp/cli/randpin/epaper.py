@@ -471,7 +471,7 @@ def main():
                                 display=display,
                                 # TODO: argument, auto-detection of default...
                                 fontface=freetype.Face('/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf'),
-                                slot_count=4,
+                                slot_count=1,
                                 zodb_path=os.path.abspath(args.filestorage),
                             ),
                         ),
