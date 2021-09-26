@@ -341,7 +341,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                 )
             # Pick manufacturer and serial number in the random range
             # ff00..fffe, as ffff has a different meaning
-            manufacturer = b'\xff' + random.randint(0, 0xff).to_bytes(1, 'big')
+            manufacturer = b'\xff' + random.randint(0, 0xfe).to_bytes(1, 'big')
             serial = random.getrandbits(32).to_bytes(4, 'big')
         # XXX: application name cannot change once set, as it's referenced at
         # card level for selection.
