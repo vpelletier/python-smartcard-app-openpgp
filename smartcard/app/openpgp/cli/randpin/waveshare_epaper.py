@@ -22,11 +22,12 @@ pins hard-coded).
 
 https://www.waveshare.com/wiki/2.13inch_e-Paper_HAT
 """
+import fcntl
+import os
+import select
 import time
-from .gpio import (
-    GPIOHANDLE_REQUEST_ACTIVE_LOW,
-    GPIOHANDLE_REQUEST_OUTPUT,
-    GPIOHANDLE_REQUEST_INPUT,
+from gpiochip2 import (
+    GPIO_V2_LINE_FLAG,
     GPIOChip,
 )
 
@@ -41,9 +42,29 @@ class WaveShareEPaper:
     _dc_file = None
     _spi_file = None
     _gpio_list = (
-        (17, 1, GPIOHANDLE_REQUEST_ACTIVE_LOW | GPIOHANDLE_REQUEST_OUTPUT, '_reset_file'),
-        (24, 0,                                 GPIOHANDLE_REQUEST_INPUT,  '_busy_file'),
-        (25, 0,                                 GPIOHANDLE_REQUEST_OUTPUT, '_dc_file'),
+        (
+            17,
+            True,
+            GPIO_V2_LINE_FLAG.ACTIVE_LOW | GPIO_V2_LINE_FLAG.OUTPUT,
+            '_reset_file',
+        ),
+        (
+            24,
+            False,
+            (
+                GPIO_V2_LINE_FLAG.EDGE_FALLING |
+                GPIO_V2_LINE_FLAG.EDGE_RISING |
+                GPIO_V2_LINE_FLAG.INPUT |
+                GPIO_V2_LINE_FLAG.BIAS_PULL_UP
+            ),
+            '_busy_file',
+        ),
+        (
+            25,
+            False,
+            GPIO_V2_LINE_FLAG.OUTPUT,
+            '_dc_file',
+        ),
     )
     _width = 122
     _height = 250
@@ -158,22 +179,34 @@ class WaveShareEPaper:
     def height(self):
         return self._height
 
+    def __init__(self):
+        self.__poll = select.poll()
+
     def __enter__(self):
         try:
             prefix = self.__class__.__name__ + '.'
             self._spi_file = open('/dev/spidev0.0', 'r+b', buffering=0)
             with GPIOChip('/dev/gpiochip0', 'r+b') as gpio_chip:
-                for gpio, default_value, mode, file_attr in self._gpio_list:
-                    setattr(self, file_attr, gpio_chip.openGPIO(
-                        pin_list=(gpio, ),
-                        mode=mode,
+                for line, default_value, flags, file_attr in self._gpio_list:
+                    setattr(self, file_attr, gpio_chip.openLines(
+                        line_list=[line],
+                        flags=flags,
                         consumer=(prefix + file_attr).encode('ascii'),
-                        default_list=(default_value, ),
+                        default_dict={0: default_value},
                     ))
+            fcntl.fcntl(
+                self._busy_file,
+                fcntl.F_SETFL,
+                fcntl.fcntl(self._busy_file, fcntl.F_GETFL) | os.O_NONBLOCK,
+            )
+            self.__poll.register(
+                self._busy_file,
+                select.POLLIN | select.POLLPRI,
+            )
             # Reset
-            self._reset_file.write(b'\x01')
+            self._reset_file |= 1
             self.wait(state=1)
-            self._reset_file.write(b'\x00')
+            self._reset_file &= 0
             self.wait()
             # Init
             y_max = self._height - 1
@@ -207,6 +240,7 @@ class WaveShareEPaper:
         if self._spi_file is not None:
             self._spi_file.close()
             self._spi_file = None
+        self.__poll.unregister(self._busy_file)
         for _, _, _, file_attr in self._gpio_list:
             gpio_file = getattr(self, file_attr)
             if gpio_file is not None:
@@ -214,22 +248,33 @@ class WaveShareEPaper:
                 setattr(self, file_attr, None)
 
     def _command(self, command, data=b''):
-        self._dc_file.write(b'\x00')
+        self._dc_file &= 0
         self._spi_file.write(command)
         if data:
-            self._dc_file.write(b'\x01')
+            self._dc_file |= 1
             self._spi_file.write(data)
 
-    def wait(self, state=0):
-        # TODO: implement GPIO edge monitoring to replace this loop, when
-        # gpio ioctl v2 is available in sid kernel.
-        for _ in range(10000):
-            value, = self._busy_file.read()
-            if value == state:
-                break
-            time.sleep(1e-3)
-        else:
-            raise ValueError('Display is stuck')
+    def wait(self, state=0, timeout=10):
+        self._busy_file.read() # discard result
+        if timeout is not None:
+            deadline = time.time() + timeout
+        while self._busy_file.value != state and (
+            timeout is None or
+            time.time() < deadline
+        ):
+            try:
+                event_list = self.__poll.poll(
+                    None
+                    if timeout is None else
+                    (deadline - time.time()) * 1000
+                )
+            except IOError as exc:
+                if exc.errno != EINTR:
+                    raise
+            if not event_list:
+                raise ValueError('Display is stuck')
+            self._busy_file.read() # discard result
+
 
     def swap(self, wait=True):
         self._command(

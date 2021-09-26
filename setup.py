@@ -42,7 +42,7 @@ setup(
     ],
     extras_require={
         'ccid': ['usb-f-ccid'],
-        'randpin': ['freetype-py'],
+        'randpin': ['freetype-py', 'gpiochip2'],
     },
     entry_points={
         'console_scripts': [
