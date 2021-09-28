@@ -68,6 +68,8 @@ fom a virtualenv at ``/opt/smartcard-openpgp``):
 USB-device-capable Raspberry Pi with IL3895/SSD1780-based ePaper displays
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+Tested on the `raspi Debian port`_ .
+
 Expected screen resolution: 250x122, such as the `WaveShare 2.13 inches e-Paper
 display V1`_, or the black-and-white `Pimoroni Inky pHAT`_.
 
@@ -130,48 +132,29 @@ prevents the UDC from detecting bus disconnection. As a result, the display does
 not change when the Pi is disconnected from the host, and refreshes twice when
 reconnected. There is no workaround known so far.
 
-Notes for Debian
-****************
+Getting access to the screen
+****************************
 
-Tested on the unofficial (but excellent) `raspi Debian port`_ .
+To configure the 40-pins connector correctly, you need to apply the following
+devicetree overlay::
 
-Sadly, the Debian kernel (as of this writing: 5.9-4) does not seem to support
-DeviceTree overlays, so there is some extra work needed:
-
-- fetch the kernel source for your current version (hint: apt-get source
-  linux-image-...), possibly on another machine
-- apply the following trivial patch to the DeviceTree compiler so it includes
-  symbols in the generated binary:
-
-  .. code:: diff
-
-    --- a/scripts/Makefile.lib 2020-12-20 00:46:45.488813401 +0000
-    +++ b/scripts/Makefile.lib 2020-12-20 00:47:21.808699913 +0000
-    @@ -318,6 +318,7 @@
-     quiet_cmd_dtc = DTC     $@
-     cmd_dtc = $(HOSTCC) -E $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ; \
-     	$(DTC) -O $(patsubst .%,%,$(suffix $@)) -o $@ -b 0 \
-    +		-@ \
-     		$(addprefix -i,$(dir $<) $(DTC_INCLUDE)) $(DTC_FLAGS) \
-     		-d $(depfile).dtc.tmp $(dtc-tmp) ; \
-     	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
-
-- build the correct DeviceTree binary file for your model (here, the zero-w).
-  This can be done on another machine, hence the ``ARCH`` variable:
-
-  .. code:: shell
-
-    ARCH=arm make bcm2835-rpi-zero-w.dtb
-
-- build the following overlay (using kernel-provided dtc command, you may also
-  install it from the ``device-tree-compiler`` package)::
-
-    // Enable spi0 interface (board pins 19, 21, 23, 24, 26)
+    // Enable SPI0 interface (board pins 19, 21, 23) and its chip-enable lines
+    //   (board pins 24, 26)
+    // setup GPIO 25 as output (data/command, board pin 22)
+    // setup GPIO 17 as output (rst, board pin 11)
+    // setup GPIO 24 as input (busy, board pin 18)
     /dts-v1/;
     /plugin/;
 
-    / {
-    compatible = "brcm,bcm2835";
+    &{/soc} {
+        gpio: gpio@7e200000 {
+            #gpio-cells = <2>;
+            #interrupt-cells = <2>;
+        };
+        spi: spi@7e204000 {
+            #address-cells = <1>;
+            #size-cells = <0>;
+        };
     };
 
     &gpio {
@@ -186,20 +169,21 @@ DeviceTree overlays, so there is some extra work needed:
             brcm,function = <4>; // alt0
             brcm,pins = <9 10 11>;
         };
+        epaper_pins {
+            brcm,function = <1 0 1>; // out in out
+            brcm,pins = <17 24 25>;
+            brcm,pull = <0 2 0>; // none pull-up none
+        };
     };
 
     &spi {
-        // CE0 is gpio 8, CE1 is gpio 7, both active low
-        cs-gpios = <&gpio 8 0x01>, <&gpio 7 0x01>;
+        cs-gpios = <&gpio 8 0x01>, <&gpio 7 0x01>; // CE0 is gpio 8, CE1 is gpio 7, both active low
         status = "okay";
         pinctrl-0 = <&spi0_cs_pins &spi0_pins>;
         pinctrl-names = "default";
-        #address-cells = <1>;
-        #size-cells = <0>;
         spidev@0 {
             // "waveshare,epaper-display-v1": because that's what it really is.
-            // "rohm,dh2228fv": this is a dirty hack, this value triggers spidev
-            // to handle this device.
+            // "rohm,dh2228fv": hack to get a spidev to this device.
             compatible = "waveshare,epaper-display-v1", "rohm,dh2228fv";
             reg = <0>; // uses CS0
             #address-cells = <1>;
@@ -208,26 +192,36 @@ DeviceTree overlays, so there is some extra work needed:
         };
     };
 
+- Compile it with the ``dtc`` command, which may be available from the
+  ``device-tree-compiler`` package:
+
   .. code:: shell
 
-    ${KERNEL_SOURCE}/scripts/dtc/dtc -I dts -O dtb -@ -o vanilla-enable-spi0.dtbo vanilla-enable-spi0.dts
+    ${KERNEL_SOURCE}/scripts/dtc/dtc -I dts -O dtb -o epaper2.13in.dtbo epaper2.13in.dts
 
 - (optional) check that the overlay is consistent with kernel's dtb using
   fdtoverlay from the ``device-tree-compiler`` package:
 
   .. code:: shell
 
-    fdtoverlay -i ${KERNEL_SOURCE}/arch/arm/boot/dts/bcm2835-rpi-zero-w.dtb -o /dev/null vanilla-enable-spi0.dtbo
+    fdtoverlay -i /boot/firmware/bcm2835-rpi-zero-w.dtb -o /dev/null epaper2.13in.dtbo
 
-  If this emits any error, then you pi may not boot with this overlay.
+  If this emits any error, then you pi may not boot with this overlay. If this
+  happens, plug the micro-sd card on a computer and comment-out the correspondig
+  ``dtoverlay`` line in ``config.txt``.
 
-- install the with-symbols devicetree and the spi overlay (as root):
+- install the devicetree overlay (as root):
 
   .. code:: shell
 
-    cp ${KERNEL_SOURCE}/arch/arm/boot/dts/bcm2835-rpi-zero-w.dtb /boot/firmware/bcm2835-rpi-zero-w_with-symbols.dtb
     mkdir -p /boot/firmware/overlays/
-    cp vanilla-enable-spi0.dtbo /boot/firmware/overlays/
+    cp epaper2.13in.dtbo /boot/firmware/overlays/
+
+- tell the raspberry pi stage 2 bootloader about both files, by adding to
+  ``/etc/default/raspi-firmware-custom``::
+
+    dtoverlay=epaper2.13in.dtbo
+
 
 - tell the raspberry pi stage 2 bootloader about both files, by editing
   ``/boot/firmware/config.txt``::
