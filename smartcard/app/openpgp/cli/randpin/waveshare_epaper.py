@@ -161,7 +161,7 @@ class WaveShareEPaper:
     def __enter__(self):
         try:
             prefix = self.__class__.__name__ + '.'
-            self._spi_file = open('/dev/spidev0.0', 'r+b', 0)
+            self._spi_file = open('/dev/spidev0.0', 'r+b', buffering=0)
             with GPIOChip('/dev/gpiochip0', 'r+b') as gpio_chip:
                 for gpio, default_value, mode, file_attr in self._gpio_list:
                     setattr(self, file_attr, gpio_chip.openGPIO(
