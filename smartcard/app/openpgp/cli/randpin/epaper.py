@@ -25,7 +25,6 @@ import os
 import random
 import select
 import sys
-import threading
 import time
 import freetype
 from functionfs.gadget import (
@@ -99,10 +98,7 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
     __battery_y = 4
     __battery_width = 32
     __battery_height = 11
-    __battery_thread_can_run = True
     __battery_last_state = (None, None)
-    __battery_pipe_read = None
-    __battery_pipe_write = None
 
     def __init__(
         self,
@@ -134,12 +130,6 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             not battery_gpio_info['flags'] & GPIO_V2_LINE_FLAG.USED
         )
         if has_battery:
-            self.__battery_poll = battery_poll = select.poll()
-            self.__battery_thread = threading.Thread(
-                target=self.__batteryUpdateThread,
-                name='battery-monitor',
-                daemon=True,
-            )
             self.__battery_gpio = battery_gpio = gpiochip.openLines(
                 line_list=[4],
                 flags=(
@@ -156,19 +146,6 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
                 fcntl.F_SETFL,
                 fcntl.fcntl(battery_gpio, fcntl.F_GETFL) | os.O_NONBLOCK,
             )
-            battery_poll.register(battery_gpio, select.POLLIN | select.POLLPRI)
-
-    def __batteryUpdateThread(self):
-        poll = self.__battery_poll.poll
-        while True:
-            # Check battery level every minute, react to events immediately
-            poll(60000)
-            # purge all available gpio events
-            self.__battery_gpio.read()
-            if not self.__battery_thread_can_run:
-                break
-            self.displayBattery()
-            self.updateDisplay(wait=False)
 
     def updateDisplay(self, wait=True):
         display = self.__display
@@ -563,24 +540,10 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             self.__card.traverse(
                 path=(MASTER_FILE_IDENTIFIER, self.__OPENPGP_FILE_IDENTIFIER),
             ).getPIN1TriesLeft()
-        if self.__has_battery:
-            battery_pipe_read, battery_pipe_write = os.pipe()
-            self.__battery_pipe_read = battery_pipe_read = os.fdopen(battery_pipe_read, 'rb', buffering=0)
-            self.__battery_pipe_write = battery_pipe_write = os.fdopen(battery_pipe_write, 'wb', buffering=0)
-            self.__battery_poll.register(battery_pipe_read, select.POLLIN)
-            self.__battery_thread_can_run = True
-            self.__battery_thread.start()
         logger.debug('Waiting for screen to be ready...')
         self.__display.wait()
 
     def __unenter(self):
-        if self.__has_battery and self.__battery_pipe_write is not None:
-            self.__battery_thread_can_run = False
-            self.__battery_pipe_write.write(b'\x00') # XXX: is closing the write end enough ?
-            self.__battery_thread.join()
-            self.__battery_poll.unregister(self.__battery_pipe_read)
-            self.__battery_pipe_write.close()
-            self.__battery_pipe_read.close()
         if self.__connection is not None:
             self.__connection.close()
             self.__connection = None
@@ -599,9 +562,46 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
         self.__unenter()
         return super().__exit__(exc_type, exc_value, traceback)
 
+    def _onBatteryEvent(self):
+        # purge all available gpio events
+        self.__battery_gpio.read()
+        self.displayBattery():
+        self.updateDisplay(wait=False)
+
     def processEventsForever(self):
         logger.info('All ready, serving until keyboard interrupt')
-        super().processEventsForever()
+        # A bit overkill for just 1 or 2 handlers and 0 or 1 timeout handlers...
+        event_dict = {
+            self.eventfd.fileno(): (select.EPOLLIN, self.processEvents),
+        }
+        timeout_handler_list = []
+        epoll_timeout = None
+        if self.__has_battery:
+            event_dict[self.__battery_gpio.fileno()] = (
+                select.POLLIN | select.POLLPRI,
+                self._onBatteryEvent,
+            )
+            # Check battery level every minute
+            epoll_timeout = 60000
+            timeout_handler_list.append(self._onBatteryEvent)
+        with select.epoll() as epoll:
+            for fd, (event_mask, _) in event_dict.items():
+                epoll.register(fd, event_mask)
+            poll = epoll.poll
+            while self._open:
+                try:
+                    event_list = poll(epoll_timeout)
+                except OSError as exc:
+                    if exc.errno != errno.EINTR:
+                        raise
+                else:
+                    if event_list:
+                        for event_fd, _ in event_list:
+                            _, event_handler = event_dict[event_fd]
+                            event_handler()
+                    else:
+                        for event_handler in timeout_handler_list:
+                            event_handler()
 
     def processEvents(self):
         super().processEvents()
