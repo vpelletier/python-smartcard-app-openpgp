@@ -191,7 +191,7 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
 
     def displayBattery(self):
         if not self.__has_battery:
-            return
+            return False
         with open(self.__battery_capacity_path, 'rb') as capacity:
             capacity = int(capacity.read().decode('ascii'))
         for level, threshold in enumerate((10, 25, 50, 75, 90, 100)):
@@ -200,7 +200,7 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
         charging = self.__battery_gpio.value
         state = (level, charging)
         if state == self.__battery_last_state:
-            return
+            return False
         self.__battery_last_state = state
         fb = self.__framebuffer
         battery_middle, battery_middle_remainder = divmod(self.__battery_height, 2)
@@ -308,6 +308,7 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
                 right_x, right_y,
                 color=Framebuffer.COLOR_OFF,
             )
+        return True
 
     def __generatePinTable(self, tries_left, force=False):
         if not self._can_generate and not force:
@@ -565,8 +566,8 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
     def _onBatteryEvent(self):
         # purge all available gpio events
         self.__battery_gpio.read()
-        self.displayBattery():
-        self.updateDisplay(wait=False)
+        if self.displayBattery():
+            self.updateDisplay(wait=False)
 
     def processEventsForever(self):
         logger.info('All ready, serving until keyboard interrupt')
