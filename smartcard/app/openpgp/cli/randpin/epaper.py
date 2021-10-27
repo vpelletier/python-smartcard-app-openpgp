@@ -583,7 +583,7 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
                 self._onBatteryEvent,
             )
             # Check battery level every minute
-            epoll_timeout = 60000
+            epoll_timeout = 60
             timeout_handler_list.append(self._onBatteryEvent)
         with select.epoll() as epoll:
             for fd, (event_mask, _) in event_dict.items():
