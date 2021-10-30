@@ -53,6 +53,14 @@ from .waveshare_epaper import WaveShareEPaper
 
 logger = logging.getLogger(__name__)
 
+# status 1 is used by unhandled exceptions
+# status 2 is unused as of this writing, but typically is a way to signal a
+# parameter error, so leave it free.
+SYSTEM_SHUTDOWN_EXIT_STATUS = 3
+class SystemShutdown(SystemExit):
+    def __init__(self):
+        super().__init__(SYSTEM_SHUTDOWN_EXIT_STATUS)
+
 # Periodically, generate new PINs, all the time that the device is enumerated by
 # a host (...and the OpenPGP application is unghostified in ZODB object cache).
 # The current and previous pins are both valid.
@@ -129,6 +137,9 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             battery_gpio_info['flags'] & GPIO_V2_LINE_FLAG.INPUT and
             not battery_gpio_info['flags'] & GPIO_V2_LINE_FLAG.USED
         )
+        self.__exit_message_x = 85
+        self.__exit_message_y = 45
+        self.__exit_message = 'Exited'
         if has_battery:
             self.__battery_gpio = battery_gpio = gpiochip.openLines(
                 line_list=[4],
@@ -194,7 +205,14 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             return False
         with open(self.__battery_capacity_path, 'rb') as capacity:
             capacity = int(capacity.read().decode('ascii'))
-        for level, threshold in enumerate((10, 25, 50, 75, 90, 100)):
+        for level, threshold in enumerate((
+            5,  # Under this, will automatically shutdown unless charging
+            10, # 0/4 level
+            25, # 1/4 level
+            50, # 2/4 level
+            75, # 3/4 level
+            90, # 4/4 level
+        )):
             if capacity < threshold:
                 break
         charging = self.__battery_gpio.value
@@ -220,38 +238,23 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             color=fb.COLOR_ON,
             fill=True,
         )
-        if level == 0:
-            if not charging:
-                fb.printLineAt(
-                    self.__fontface,
-                    x=self.__battery_x + self.__battery_width // 2 - 2,
-                    y=self.__battery_y + 1,
-                    text="!",
-                    width=16,
-                    height=self.__battery_height,
-                    color=Framebuffer.COLOR_OFF,
-                )
+        if not charging and level == 0:
+            self.__exit_message_x = 60
+            self.__exit_message_y = 45
+            self.__exit_message = "Low battery"
+            raise SystemShutdown
+        bar_width = (self.__battery_width - 4) // 4
+        for index in range(4):
             fb.rect(
-                self.__battery_x + self.__battery_width - 5,
+                self.__battery_x + 2 + index       * bar_width + 1,
                 self.__battery_y + 1,
-                self.__battery_x + self.__battery_width - 3,
+                self.__battery_x + 2 + (index + 1) * bar_width - 1,
                 self.__battery_y - 1 + self.__battery_height,
                 color=fb.COLOR_OFF,
-                fill=True,
+                fill=level > (4 - index),
             )
-        else:
-            bar_width = (self.__battery_width - 4) // 4
-            for index in range(4):
-                fb.rect(
-                    self.__battery_x + 2 + index       * bar_width + 1,
-                    self.__battery_y + 1,
-                    self.__battery_x + 2 + (index + 1) * bar_width - 1,
-                    self.__battery_y - 1 + self.__battery_height,
-                    color=fb.COLOR_OFF,
-                    fill=level > (4 - index),
-                )
         if charging:
-            # Draw the litning bolt as two filled triangles
+            # Draw the lightning bolt as two filled triangles
             left_x = self.__battery_x + 4
             left_y = self.__battery_y + 6
             right_x = self.__battery_x + self.__battery_width - 4
@@ -553,9 +556,9 @@ class ICCDFunctionWithRandomPinDisplay(ICCDFunction):
             self.__db = None
         self._blank(color=Framebuffer.COLOR_OFF)
         self.printAt(
-            x=85,
-            y=45,
-            text="Exited",
+            x=self.__exit_message_x,
+            y=self.__exit_message_y,
+            text=self.__exit_message,
         )
         self.updateDisplay()
 
@@ -666,45 +669,49 @@ def main():
     logger.setLevel(
         level=args.verbose.upper(),
     )
-    with (
-        WaveShareEPaper() as display,
-        GPIOChip('/dev/gpiochip0', 'w+b') as gpiochip,
-        GadgetSubprocessManager(
-            args=args,
-            config_list=[
-                # A single configuration
-                {
-                    'function_list': [
-                        functools.partial(
-                            ConfigFunctionFFSSubprocess,
-                            getFunction=functools.partial(
-                                ICCDFunctionWithRandomPinDisplay,
-                                display=display,
-                                # TODO: argument, auto-detection of default...
-                                fontface=freetype.Face('/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf'),
-                                slot_count=1,
-                                zodb_path=os.path.abspath(args.filestorage),
-                                gpiochip=gpiochip,
-                            ),
+    display = WaveShareEPaper()
+    gpiochip = GPIOChip('/dev/gpiochip0', 'w+b')
+    gadget = GadgetSubprocessManager(
+        args=args,
+        config_list=[
+            {
+                'function_list': [
+                    functools.partial(
+                        ConfigFunctionFFSSubprocess,
+                        getFunction=functools.partial(
+                            ICCDFunctionWithRandomPinDisplay,
+                            display=display,
+                            # TODO: argument, auto-detection of default...
+                            fontface=freetype.Face('/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf'),
+                            slot_count=1,
+                            zodb_path=os.path.abspath(args.filestorage),
+                            gpiochip=gpiochip,
                         ),
-                    ],
-                    'MaxPower': 500,
-                    'lang_dict': {
-                        0x409: {
-                            'configuration': 'python-usb-f-iccd reader with openpgp card',
-                        },
+                    ),
+                ],
+                'MaxPower': 500,
+                'lang_dict': {
+                    0x409: {
+                        'configuration': 'python-usb-f-iccd reader with openpgp card',
                     },
-                }
-            ],
-            idVendor=0x1d6b,
-            idProduct=0x0104,
-            lang_dict={
-                0x409: {
-                    'serialnumber': args.serial,
-                    'product': 'python-smartcard-app-openpgp',
-                    'manufacturer': 'Vincent Pelletier',
                 },
+            }
+        ],
+        idVendor=0x1d6b,
+        idProduct=0x0104,
+        lang_dict={
+            0x409: {
+                'serialnumber': args.serial,
+                'product': 'python-smartcard-app-openpgp',
+                'manufacturer': 'Vincent Pelletier',
             },
-        ) as gadget
-    ):
+        },
+    )
+    with display, gpiochip, gadget:
         gadget.waitForever()
+    # CCID function may request special actions to do after exiting. For example
+    # it may request a shutdown when it detects the battery is discharging below
+    # a certain threshold.
+    exit_status = gadget.getFunction(0, 0).getExitStatus()
+    if exit_status == SYSTEM_SHUTDOWN_EXIT_STATUS:
+        os.system('poweroff')
