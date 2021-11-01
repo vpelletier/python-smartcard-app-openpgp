@@ -14,7 +14,8 @@ Warning
 
   - it may allow access to unexpected pieces of data
   - cryptographic functions may contain bugs making decryption either
-    impossible or trivial to an attacker
+    impossible to one in posession of the decryption key, or trivial to one not
+    in posession of the decryption key.
 
 - it may support weak cryptographic algorithms (weak hashes, weak elliptic
   curves, ...)
@@ -22,7 +23,7 @@ Warning
 Fee free to play with it, review it and contribute. But **DO NOT USE IT ON
 SENSIBLE OR VALUABLE DATA**, and **DO NOT IMPORT VALUABLE KEYS IN IT**.
 
-This code is in dire need for reviewing and testing.
+This code is in dire need of reviews and tests.
 
 Installation
 ------------
@@ -81,15 +82,18 @@ contains the valid PIN.
 The cell containing the valid PIN can be changed by requesting a PW1 change, and
 providing a specially-formatted new password.
 For example: ``C30000`` references cell ``C3``, ``2b0000`` references cell
-``B2``. Trailing zeroes are ignored.
+``B2``. Trailing zeroes are ignored, but may be necessary to get the host's
+software to actually send the pin to the device.
 
-The grid changes periodically, as the card is used (at most once every
-30 seconds), and both the currently-displayed (at the time the "verify" command
-runs ont the card) and the previous PIN are accepted as a correct PIN.
+The grid changes periodically, when the card is accessed but at most once every
+30 seconds or when a ``verify`` command is run (whichever comes first), and both
+the currently-displayed (at the time the "verify" command runs ont the card) and
+the previous PIN are accepted as a correct PIN.
 
 Key Derivation Function (KDF-DO) is not available in this mode.
 
-Similar to the `No extra hardware requirements`_ variant, but starting with:
+usage is similar to the `No extra hardware requirements`_ variant, but starts
+with:
 
 .. code:: shell
 
@@ -103,16 +107,20 @@ Screen layout
 
 |smartcard-openpgp-randpin-epaper screenshot|
 
-Top left corner: number of PW1 tries left. ○ are for tries left, ⨯ for tries
-used. Here, there are 2 tries left out of 3.
+(support for data URLs is needed to see an image here - unfortunately github and
+pypi seem hostile to data URLs)
 
-Left and top borders, white text on black background: row and column titles.
+- Top left corner: number of PW1 tries left. ○ are for tries left, ⨯ for tries
+  used. Here, there are 2 tries left out of 3.
 
-Main area: PIN grid. If this card uses the default pin cell, PW1 is ``291413``.
+- Left and top borders, white text on black background: row and column titles.
 
-This grid is completely regenerated when card commands are issued (even if no
-PIN input is required), at most once every 30 seconds or after each ``verify``
-command, whichever comes first.
+- Main area: PIN grid. If this card uses the default pin cell, PW1 is
+  ``291413``.
+
+- Top right corner (not present here): Battery level (from ■■■■ for a >90%
+  charged battery to □□□□ for a <10% discharged battery). A lightning bolt logo
+  is superimposed to the battery level when the battery is being charged.
 
 External requirements
 *********************
@@ -130,7 +138,7 @@ Limitations
 The Raspberry Pi Zero has the USB Vbus pins bridged to the 5v power rail, which
 prevents the UDC from detecting bus disconnection. As a result, the display does
 not change when the Pi is disconnected from the host, and refreshes twice when
-reconnected. There is no workaround known so far.
+reconnected.
 
 Getting access to the screen
 ****************************
