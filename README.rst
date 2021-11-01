@@ -132,6 +132,18 @@ font to be located at ``/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf``:
 
     apt-get install fonts-noto-mono
 
+If you have a battery, it further expects systemd-logind to be reachable through
+DBus, where it will instruct it to not trigger the idle action while plugged to
+a host, allowing logind to be configured to automatically shut the system down
+independently from the battery level, thereby saving the battery from undergoing
+unnecessary charge/discharge cycles. For example, you may want to put the
+following in your `/etc/systemd/logind.conf`:
+
+  .. code::
+
+    IdleAction=poweroff
+    IdleActionSec=15min
+
 Limitations
 ***********
 
