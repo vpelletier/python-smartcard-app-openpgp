@@ -1126,7 +1126,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         """
         # XXX: store __reference_data_counter_list outside of ZODB ? this may
         # get a lot of history...
-        if self.__reference_data_counter_list[index] == 0:
+        if self._getReferenceDataTriesLeft(index) == 0:
             raise AuthMethodBlocked
         secret_set = self._getReferenceDataSet(index=index)
         if not secret_set:
@@ -1210,7 +1210,7 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
         else:
             if not channel.isUserAuthenticated(level=level):
                 raise WarnPersistentChanged(
-                    remaining=self.__reference_data_counter_list[index],
+                    remaining=self._getReferenceDataTriesLeft(index),
                 ) from None
 
     def logout(self, channel, level, command_data):
