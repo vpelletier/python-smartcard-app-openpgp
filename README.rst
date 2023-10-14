@@ -154,18 +154,8 @@ devicetree overlay::
     /dts-v1/;
     /plugin/;
 
-    &{/soc} {
-        gpio: gpio@7e200000 {
-            #gpio-cells = <2>;
-            #interrupt-cells = <2>;
-        };
-        spi: spi@7e204000 {
-            #address-cells = <1>;
-            #size-cells = <0>;
-        };
-    };
-
-    &gpio {
+    &gpio { // @7e200000
+        #gpio-cells = <2>;
         alt0 {
             brcm,pins = <4 5>; // removed 7, 8, 9, 10, 11
         };
@@ -184,18 +174,20 @@ devicetree overlay::
         };
     };
 
-    &spi {
+    &spi { // @7e204000
+        #address-cells = <1>;
+        #size-cells = <0>;
         cs-gpios = <&gpio 8 0x01>, <&gpio 7 0x01>; // CE0 is gpio 8, CE1 is gpio 7, both active low
         status = "okay";
         pinctrl-0 = <&spi0_cs_pins &spi0_pins>;
         pinctrl-names = "default";
         spidev@0 {
+            #address-cells = <1>;
+            #size-cells = <0>;
             // "waveshare,epaper-display-v1": because that's what it really is.
             // "rohm,dh2228fv": hack to get a spidev to this device.
             compatible = "waveshare,epaper-display-v1", "rohm,dh2228fv";
             reg = <0>; // uses CS0
-            #address-cells = <1>;
-            #size-cells = <0>;
             spi-max-frequency = <4000000>; // 4MHz: tcycle >= 250ns
         };
     };
@@ -249,18 +241,8 @@ devicetree overlay::
     /dts-v1/;
     /plugin/;
 
-    &{/soc} {
-        gpio: gpio@7e200000 {
-            #gpio-cells = <2>;
-            #interrupt-cells = <2>;
-        };
-        i2c: i2c@7e804000 {
-            #address-cells = <1>;
-            #size-cells = <0>;
-        };
-    };
-
-    &gpio {
+    &gpio { // @7e200000
+        #gpio-cells = <2>;
         alt0 {
             brcm,pins = <5>; // removed 4, 7, 8, 9, 10, 11
         };
@@ -271,7 +253,9 @@ devicetree overlay::
         };
     };
 
-    &i2c {
+    &i2c1 { // @7e804000
+        #address-cells = <1>;
+        #size-cells = <0>;
         battery@36 {
             compatible = "maxim,max17040";
             reg = <0x36>;
