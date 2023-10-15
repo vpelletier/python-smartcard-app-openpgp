@@ -1203,10 +1203,10 @@ class OpenPGP(PersistentWithVolatileSurvivor, ApplicationFile):
                     ),
                 )
             except APDUException:
-                channel.clearUserAuthentication(level)
+                channel.clearUserAuthentication(level=level)
                 raise
             else:
-                channel.setUserAuthentication(level)
+                channel.setUserAuthentication(level=level)
         else:
             if not channel.isUserAuthenticated(level=level):
                 raise WarnPersistentChanged(
